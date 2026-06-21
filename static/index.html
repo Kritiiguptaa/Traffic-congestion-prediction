@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bengaluru Parking Hotspot Intelligence</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #1c2330;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --accent:    #f78166;   /* Bengaluru traffic red-orange */
+    --accent2:   #3fb950;   /* green = low risk */
+    --warn:      #d29922;   /* amber = medium */
+    --danger:    #f85149;   /* red = high */
+    --low:       #3fb950;
+    --medium:    #d29922;
+    --high:      #f85149;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Inter', sans-serif;
+    --radius:    8px;
+    --shadow:    0 4px 24px rgba(0,0,0,.5);
+  }
+
+  html, body { height: 100%; font-family: var(--sans); background: var(--bg); color: var(--text); overflow: hidden; }
+
+  #map { position: fixed; inset: 0; z-index: 0; }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 360px; z-index: 10;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #sidebar-header h1 {
+    font-size: 13px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  #sidebar-header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  #sidebar-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+  #sidebar-body::-webkit-scrollbar { width: 4px; }
+  #sidebar-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── SEARCH ── */
+  .search-wrap { position: relative; }
+  #search-input {
+    width: 100%; padding: 9px 12px; padding-right: 36px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 13px;
+    outline: none; font-family: var(--sans);
+    transition: border-color .15s;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--muted); }
+  #search-clear {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 16px; line-height: 1; display: none;
+  }
+  #search-results {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-top: 4px; display: none; overflow: hidden;
+  }
+  .search-result {
+    padding: 9px 12px; font-size: 12px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover { background: var(--surface); }
+  .search-result .sr-label { font-weight: 600; color: var(--text); }
+  .search-result .sr-meta { color: var(--muted); margin-top: 2px; font-size: 11px; }
+  .score-pill {
+    display: inline-block; padding: 1px 6px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; margin-left: 6px;
+    font-family: var(--mono);
+  }
+  .pill-high   { background: rgba(248,81,73,.18);  color: var(--high); }
+  .pill-medium { background: rgba(210,153,34,.18); color: var(--medium); }
+  .pill-low    { background: rgba(63,185,80,.18);  color: var(--low); }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+
+  /* ── PREDICT FORM ── */
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .form-group input {
+    padding: 8px 10px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size: 12px; font-family: var(--mono);
+    outline: none; transition: border-color .15s;
+  }
+  .form-group input:focus { border-color: var(--accent); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  #predict-btn {
+    padding: 9px 14px; background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius); font-size: 13px;
+    font-weight: 600; cursor: pointer; width: 100%;
+    font-family: var(--sans); transition: opacity .15s;
+  }
+  #predict-btn:hover { opacity: .88; }
+  #predict-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ── RESULT CARD ── */
+  #result-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; display: none;
+  }
+  .result-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .risk-badge {
+    font-size: 12px; font-weight: 700; padding: 3px 10px;
+    border-radius: 20px; text-transform: uppercase; letter-spacing: .05em;
+  }
+  .risk-high   { background: rgba(248,81,73,.18);  color: var(--high); }
+  .risk-medium { background: rgba(210,153,34,.18); color: var(--medium); }
+  .risk-low    { background: rgba(63,185,80,.18);  color: var(--low); }
+  .score-big { font-family: var(--mono); font-size: 28px; font-weight: 700; }
+
+  .breakdown-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
+  }
+  .breakdown-item {
+    background: var(--surface); border-radius: 6px; padding: 8px 10px;
+  }
+  .breakdown-item .bi-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .breakdown-item .bi-val   { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+
+  .source-tag {
+    display: inline-block; font-size: 10px; padding: 1px 6px;
+    border-radius: 4px; background: rgba(255,255,255,.06);
+    color: var(--muted); margin-top: 4px;
+  }
+
+  /* ── DOW CHART ── */
+  #dow-section { display: none; }
+  #dow-chart { display: flex; align-items: flex-end; gap: 5px; height: 72px; margin-top: 6px; }
+  .dow-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .dow-bar {
+    width: 100%; border-radius: 3px 3px 0 0;
+    transition: height .4s ease, background .3s;
+    min-height: 3px;
+  }
+  .dow-bar-label { font-size: 9px; color: var(--muted); font-weight: 600; }
+  .dow-bar-val   { font-size: 9px; color: var(--muted); font-family: var(--mono); }
+
+  /* ── CLUSTER INFO ── */
+  #cluster-info { display: none; }
+  .cluster-stat { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .cluster-stat:last-child { border-bottom: none; }
+  .cluster-stat .cs-key { color: var(--muted); }
+  .cluster-stat .cs-val { font-weight: 600; font-family: var(--mono); }
+
+
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+  /* ── LEAFLET OVERRIDES ── */
+  .leaflet-control-zoom a { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
+  .leaflet-popup-content-wrapper { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .leaflet-popup-tip { background: var(--surface); }
+  .leaflet-popup-content { font-family: var(--sans); font-size: 12px; line-height: 1.6; }
+
+  /* ── CLICK MARKER ── */
+  .click-dot { width: 14px; height: 14px; background: var(--accent); border: 2px solid #fff; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>Bengaluru Hotspot Intel</h1>
+    <p>Parking violation congestion · Jan–May dataset</p>
+  </div>
+
+  <div id="sidebar-body">
+
+    <!-- SEARCH -->
+    <div>
+      <div class="section-label">Search location</div>
+      <div class="search-wrap">
+        <input id="search-input" type="text" placeholder="Junction, police station, area…" autocomplete="off" />
+        <button id="search-clear">✕</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- PREDICT FORM -->
+    <div>
+      <div class="section-label">Predict congestion impact</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Latitude</label>
+            <input id="inp-lat" type="number" step="any" placeholder="12.9716" />
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input id="inp-lng" type="number" step="any" placeholder="77.5946" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date</label>
+            <input id="inp-date" type="date" />
+          </div>
+          <div class="form-group">
+            <label>Time</label>
+            <input id="inp-time" type="time" value="09:00" />
+          </div>
+        </div>
+        <button id="predict-btn">Predict impact →</button>
+      </div>
+    </div>
+
+    <!-- RESULT CARD -->
+    <div id="result-card">
+      <div class="result-top">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Congestion Impact</div>
+          <div class="score-big" id="res-score">—</div>
+        </div>
+        <div id="res-badge" class="risk-badge">—</div>
+      </div>
+
+      <div class="breakdown-grid">
+        <div class="breakdown-item">
+          <div class="bi-label">Severity</div>
+          <div class="bi-val" id="res-severity">—</div>
+          <div class="source-tag" id="res-sev-src">—</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="bi-label">Activity factor</div>
+          <div class="bi-val" id="res-activity">—</div>
+          <div class="source-tag" id="res-act-src">—</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="bi-label">Day of week</div>
+          <div class="bi-val" id="res-dow">—</div>
+          <div class="source-tag" id="res-dow-w">—</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="bi-label">Nearest cluster</div>
+          <div class="bi-val" id="res-cluster">—</div>
+          <div class="source-tag" id="res-dist">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOW CHART -->
+    <div id="dow-section">
+      <div class="section-label">Weekly impact pattern</div>
+      <div id="dow-chart"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- CLUSTER DETAIL -->
+    <div id="cluster-info">
+      <div class="section-label" id="cluster-info-title">Selected cluster</div>
+      <div id="cluster-stats-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// MAP SETUP
+// ─────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([12.9716, 77.5946], 12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd', maxZoom: 20,
+}).addTo(map);
+
+let heatLayer   = null;
+let markerLayer = L.layerGroup().addTo(map);
+let clickMarker = null;
+let allClusters = [];
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function riskColor(score) {
+  if (score >= 0.45) return '#f85149';
+  if (score >= 0.25) return '#d29922';
+  return '#3fb950';
+}
+function riskClass(level) {
+  return { high: 'risk-high', medium: 'risk-medium', low: 'risk-low' }[level] || 'risk-low';
+}
+function pillClass(score) {
+  if (score >= 0.45) return 'pill-high';
+  if (score >= 0.25) return 'pill-medium';
+  return 'pill-low';
+}
+function fmt(v) { return typeof v === 'number' ? v.toFixed(3) : v ?? '—'; }
+
+// ─────────────────────────────────────────────
+// LOAD CLUSTERS
+// ─────────────────────────────────────────────
+async function loadClusters() {
+  try {
+    const r = await fetch('/api/clusters');
+    const d = await r.json();
+    allClusters = d.clusters || [];
+    renderMap(allClusters);
+  } catch(e) {
+    console.error('Failed to load clusters', e);
+  }
+}
+
+function renderMap(clusters) {
+  markerLayer.clearLayers();
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+  if (!clusters.length) return;
+
+  // heatmap — boosted opacity and radius for visibility
+  const heat = clusters.map(c => [c.latitude, c.longitude, c.cluster_score]);
+  heatLayer = L.heatLayer(heat, {
+    radius: 50, blur: 30, maxZoom: 17, minOpacity: 0.55,
+    gradient: { 0.0: '#3fb950', 0.4: '#d29922', 0.7: '#f85149', 1.0: '#ff0000' }
+  }).addTo(map);
+
+  // circle markers — more opaque and larger so they're clearly visible
+  clusters.forEach(c => {
+    const col = riskColor(c.avg_impact);
+    const r   = 10 + c.cluster_score * 18;
+    const m = L.circleMarker([c.latitude, c.longitude], {
+      radius: r, color: col, weight: 2,
+      fillColor: col, fillOpacity: 0.65,
+    }).addTo(markerLayer);
+
+    m.bindPopup(`
+      <b>${c.location || c.police_station || 'Cluster ' + c.cluster_id}</b><br/>
+      Violations: <b>${c.violations}</b><br/>
+      Avg impact: <b>${fmt(c.avg_impact)}</b><br/>
+      Cluster score: <b>${fmt(c.cluster_score)}</b><br/>
+      ${c.junction_name && c.junction_name !== 'No Junction' ? 'Junction: ' + c.junction_name + '<br/>' : ''}
+      ${c.police_station ? 'Station: ' + c.police_station : ''}
+    `);
+
+    m.on('click', () => showClusterInfo(c));
+  });
+}
+
+// ─────────────────────────────────────────────
+// SHOW CLUSTER INFO + DOW CHART
+// ─────────────────────────────────────────────
+function showClusterInfo(c) {
+  document.getElementById('cluster-info').style.display = 'block';
+  document.getElementById('cluster-info-title').textContent =
+    c.location || c.police_station || `Cluster ${c.cluster_id}`;
+
+  const list = document.getElementById('cluster-stats-list');
+  list.innerHTML = `
+    <div class="cluster-stat"><span class="cs-key">Violations</span><span class="cs-val">${c.violations}</span></div>
+    <div class="cluster-stat"><span class="cs-key">Avg impact</span><span class="cs-val">${fmt(c.avg_impact)}</span></div>
+    <div class="cluster-stat"><span class="cs-key">Cluster score</span><span class="cs-val">${fmt(c.cluster_score)}</span></div>
+    <div class="cluster-stat"><span class="cs-key">Junction</span><span class="cs-val">${c.junction_name || '—'}</span></div>
+    <div class="cluster-stat"><span class="cs-key">Police station</span><span class="cs-val">${c.police_station || '—'}</span></div>
+  `;
+
+  // set lat/lng in predict form
+  document.getElementById('inp-lat').value = c.latitude.toFixed(6);
+  document.getElementById('inp-lng').value = c.longitude.toFixed(6);
+
+  renderDowChart(c.dow_profile || {});
+}
+
+function renderDowChart(profile) {
+  const section = document.getElementById('dow-section');
+  const chart   = document.getElementById('dow-chart');
+  const days    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  if (!Object.keys(profile).length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+
+  // profile keys may be integer (0-6) or name strings — normalise to names
+  const byName = {};
+  for (const [k, v] of Object.entries(profile)) {
+    const idx = parseInt(k);
+    const name = isNaN(idx) ? k : days[idx];
+    if (name) byName[name] = v;
+  }
+
+  const vals  = days.map(d => byName[d] ?? 0);
+  const maxV  = Math.max(...vals, 0.001);
+
+  chart.innerHTML = days.map((d, i) => {
+    const v   = vals[i];
+    const pct = Math.round((v / maxV) * 100);
+    const col = riskColor(v);
+    return `
+      <div class="dow-bar-wrap">
+        <div class="dow-bar-val">${v > 0 ? v.toFixed(2) : ''}</div>
+        <div class="dow-bar" style="height:${Math.max(pct * 0.56, 3)}px;background:${col}"></div>
+        <div class="dow-bar-label">${d}</div>
+      </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+// MAP CLICK → fill lat/lng
+// ─────────────────────────────────────────────
+map.on('click', e => {
+  const { lat, lng } = e.latlng;
+  document.getElementById('inp-lat').value = lat.toFixed(6);
+  document.getElementById('inp-lng').value = lng.toFixed(6);
+
+  if (clickMarker) map.removeLayer(clickMarker);
+  clickMarker = L.marker([lat, lng], {
+    icon: L.divIcon({ className: '', html: '<div class="click-dot"></div>', iconSize: [14,14], iconAnchor:[7,7] })
+  }).addTo(map);
+});
+
+// ─────────────────────────────────────────────
+// SEARCH
+// ─────────────────────────────────────────────
+const searchInput   = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+const searchClear   = document.getElementById('search-clear');
+let searchTimer = null;
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim();
+  searchClear.style.display = q ? 'block' : 'none';
+  clearTimeout(searchTimer);
+  if (q.length < 2) { searchResults.style.display = 'none'; return; }
+  searchTimer = setTimeout(() => doSearch(q), 280);
+});
+
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClear.style.display = 'none';
+  searchResults.style.display = 'none';
+});
+
+async function doSearch(q) {
+  try {
+    const r = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    const results = d.results || [];
+    if (!results.length) { searchResults.style.display = 'none'; return; }
+
+    searchResults.innerHTML = results.map(m => `
+      <div class="search-result" data-lat="${m.latitude}" data-lng="${m.longitude}" data-cid="${m.cluster_id}">
+        <div class="sr-label">${m.label || m.police_station || 'Cluster ' + m.cluster_id}
+          <span class="score-pill ${pillClass(m.cluster_score)}">${m.cluster_score}</span>
+        </div>
+        <div class="sr-meta">${m.junction_name || ''} ${m.police_station ? '· ' + m.police_station : ''}</div>
+      </div>
+    `).join('');
+    searchResults.style.display = 'block';
+
+    searchResults.querySelectorAll('.search-result').forEach(el => {
+      el.addEventListener('click', () => {
+        const lat = parseFloat(el.dataset.lat);
+        const lng = parseFloat(el.dataset.lng);
+        const cid = parseInt(el.dataset.cid);
+        map.flyTo([lat, lng], 16);
+        document.getElementById('inp-lat').value = lat.toFixed(6);
+        document.getElementById('inp-lng').value = lng.toFixed(6);
+        searchResults.style.display = 'none';
+        const cluster = allClusters.find(c => c.cluster_id === cid);
+        if (cluster) showClusterInfo(cluster);
+      });
+    });
+  } catch(e) { searchResults.style.display = 'none'; }
+}
+
+// ─────────────────────────────────────────────
+// PREDICT
+// ─────────────────────────────────────────────
+// Set default date to today
+const today = new Date();
+document.getElementById('inp-date').value = today.toISOString().slice(0,10);
+
+document.getElementById('predict-btn').addEventListener('click', predict);
+
+async function predict() {
+  const lat  = parseFloat(document.getElementById('inp-lat').value);
+  const lng  = parseFloat(document.getElementById('inp-lng').value);
+  const date = document.getElementById('inp-date').value;
+  const time = document.getElementById('inp-time').value;
+
+  if (isNaN(lat) || isNaN(lng)) {
+    alert('Click the map or enter lat/lng first.');
+    return;
+  }
+
+  const when  = date && time ? `${date}T${time}` : new Date().toISOString().slice(0,16);
+  const btn   = document.getElementById('predict-btn');
+  btn.disabled = true;
+  btn.textContent = 'Predicting…';
+
+  try {
+    const r = await fetch(`/api/predict?lat=${lat}&lng=${lng}&when=${encodeURIComponent(when)}`);
+    const d = await r.json();
+    showResult(d);
+  } catch(e) {
+    alert('Prediction failed. Is the server running?');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Predict impact →';
+  }
+}
+
+function showResult(d) {
+  const card = document.getElementById('result-card');
+  card.style.display = 'block';
+
+  const score = d.predicted_score ?? 0;
+  const level = d.risk_level ?? 'low';
+  const col   = riskColor(score);
+
+  document.getElementById('res-score').textContent   = score.toFixed(3);
+  document.getElementById('res-score').style.color   = col;
+  const badge = document.getElementById('res-badge');
+  badge.textContent  = level.toUpperCase();
+  badge.className    = `risk-badge ${riskClass(level)}`;
+
+  document.getElementById('res-severity').textContent  = fmt(d.severity_score);
+  document.getElementById('res-sev-src').textContent   = d.severity_source ?? '—';
+  document.getElementById('res-activity').textContent  = fmt(d.activity_factor);
+  document.getElementById('res-act-src').textContent   = d.activity_source ?? '—';
+  document.getElementById('res-dow').textContent       = d.dow_name ?? '—';
+  document.getElementById('res-dow-w').textContent     = `weight ${d.dow_weight ?? '—'}`;
+  document.getElementById('res-cluster').textContent   =
+    d.nearest_cluster_id != null ? `#${d.nearest_cluster_id}` : 'None nearby';
+  document.getElementById('res-dist').textContent      =
+    d.nearest_cluster_dist_m != null ? `${d.nearest_cluster_dist_m}m` : '> 300m';
+
+  // DOW profile from prediction response
+  if (d.dow_profile && Object.keys(d.dow_profile).length) {
+    renderDowChart(d.dow_profile);
+  }
+
+  // scroll result into view
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ─────────────────────────────────────────────
+// STATUS + REFRESH
+// ─────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+loadClusters();
+</script>
+</body>
+</html>
