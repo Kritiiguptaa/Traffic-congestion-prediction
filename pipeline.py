@@ -209,9 +209,9 @@ def load_and_score(filepath: str) -> pd.DataFrame:
 # ─────────────────────────────────────────────
 # CLUSTERING
 # ─────────────────────────────────────────────
-def cluster_hotspots(df: pd.DataFrame, eps_m: float = 100, min_samples: int = 20) -> pd.DataFrame:
+def cluster_hotspots(df: pd.DataFrame, eps_m: float = 200, min_samples: int = 20) -> pd.DataFrame:
     coords = np.radians(df[["latitude", "longitude"]])
-    db = DBSCAN(eps=eps_m / 6371000, min_samples=min_samples, metric="haversine")
+    db = DBSCAN(eps=eps_m / 6371000, min_samples=min_samples, metric="haversine", n_jobs=-1)
     df = df.copy()
     df["cluster_id"] = db.fit_predict(coords)
     return df
@@ -275,7 +275,7 @@ def build_cluster_stats(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────
 # FULL PIPELINE
 # ─────────────────────────────────────────────
-def run_pipeline(filepath: str, eps_m: float = 100, min_samples: int = 20):
+def run_pipeline(filepath: str, eps_m: float = 200, min_samples: int = 20):
     """Load -> score -> cluster -> aggregate. Returns (scored_df, cluster_stats)."""
     df = load_and_score(filepath)
     df = cluster_hotspots(df, eps_m=eps_m, min_samples=min_samples)
@@ -285,7 +285,7 @@ def run_pipeline(filepath: str, eps_m: float = 100, min_samples: int = 20):
 
 if __name__ == "__main__":
     scored, stats = run_pipeline(
-        "jan to may police violation_anonymized791b166_without_null_only_columns.xlsx"
+        "jan to may police violation_anonymized791b166_without_null_only_columns.csv"
     )
     print(f"Rows scored : {len(scored)}")
     print(f"Clusters    : {len(stats)}")

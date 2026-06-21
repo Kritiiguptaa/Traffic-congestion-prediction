@@ -18,7 +18,7 @@ from temporal_model import HotspotPredictor
 
 DATA_FILE = os.environ.get(
     "VIOLATIONS_FILE",
-    "jan to may police violation_anonymized791b166_without_null_only_columns.xlsx"
+    "jan to may police violation_anonymized791b166_without_null_only_columns.csv"
 )
 
 app = Flask(__name__, static_folder="static", static_url_path="")
