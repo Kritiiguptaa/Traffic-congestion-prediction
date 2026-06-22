@@ -10,8 +10,15 @@ Endpoints:
   GET  /                           -> serves the frontend
 """
 import os
+import math
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
+
+
+def clean_str(v, default=""):
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return default
+    return str(v)
 
 from pipeline import run_pipeline
 from temporal_model import HotspotPredictor
@@ -48,18 +55,35 @@ def api_clusters():
     if stats is None or stats.empty:
         return jsonify({"clusters": [], "last_loaded": state["last_loaded"]})
 
+    when_str = request.args.get("when")
+    when = None
+    if when_str:
+        try:
+            when = datetime.fromisoformat(when_str)
+        except ValueError:
+            return jsonify({"error": "when must be ISO format, e.g. 2024-12-16T09:00"}), 400
+
+    predictor = state["predictor"]
+
     out = []
     for cid, row in stats.iterrows():
+        lat, lng = float(row["latitude"]), float(row["longitude"])
+        if when is not None and predictor is not None:
+            predicted_score = predictor.predict(lat, lng, when)["predicted_score"]
+        else:
+            predicted_score = round(float(row["cluster_score"]), 3)
+
         out.append({
             "cluster_id": int(row["cluster_id"]),
-            "latitude": float(row["latitude"]),
-            "longitude": float(row["longitude"]),
+            "latitude": lat,
+            "longitude": lng,
             "violations": int(row["violations"]),
             "avg_impact": round(float(row["avg_impact"]), 3),
             "cluster_score": round(float(row["cluster_score"]), 3),
-            "police_station": row.get("police_station", ""),
-            "junction_name": row.get("junction_name", ""),
-            "location": row.get("location", ""),
+            "predicted_score": predicted_score,
+            "police_station": clean_str(row.get("police_station")),
+            "junction_name": clean_str(row.get("junction_name")),
+            "location": clean_str(row.get("location")),
         })
     return jsonify({"clusters": out, "last_loaded": state["last_loaded"]})
 
@@ -106,9 +130,9 @@ def api_geocode():
                 "cluster_id": int(row["cluster_id"]),
                 "latitude": float(row["latitude"]),
                 "longitude": float(row["longitude"]),
-                "label": row.get("location", "") or row.get("police_station", ""),
-                "police_station": row.get("police_station", ""),
-                "junction_name": row.get("junction_name", ""),
+                "label": clean_str(row.get("location")) or clean_str(row.get("police_station")),
+                "police_station": clean_str(row.get("police_station")),
+                "junction_name": clean_str(row.get("junction_name")),
                 "cluster_score": round(float(row["cluster_score"]), 3),
             })
     matches.sort(key=lambda m: -m["cluster_score"])

@@ -70,7 +70,8 @@ class HotspotPredictor:
         )
         # activity_factor: relative volume within each cluster [0.4, 1.0]
         max_count = self.pattern.groupby("cluster_id")["count"].transform("max")
-        self.pattern["activity_factor"] = 0.4 + 0.6 * (self.pattern["count"] / max_count)
+        # self.pattern["activity_factor"] = 0.4 + 0.6 * (self.pattern["count"] / max_count)
+        self.pattern["activity_factor"] = 0.65 + 0.35 * (self.pattern["count"] / max_count)
 
     def _lookup_pattern(self, cluster_id, when: datetime):
         if self.pattern.empty:

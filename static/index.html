@@ -1,590 +1,784 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bengaluru Parking Hotspot Intelligence</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<title>Bengaluru Parking Hotspots</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root{
+    --ink:#1a1a1a;
+    --paper:#ffffff;
+    --line:#e3e3e3;
+    --muted:#6b6b6b;
+    --high:#d6463a;
+    --medium:#e0a02e;
+    --low:#3b8f5c;
+    --accent:#1f6feb;
+    --shadow: 0 1px 2px rgba(0,0,0,0.08), 0 4px 14px rgba(0,0,0,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);}
+  #map{position:absolute;inset:0;z-index:0;}
 
-  :root {
-    --bg:        #0d1117;
-    --surface:   #161b22;
-    --surface2:  #1c2330;
-    --border:    #30363d;
-    --text:      #e6edf3;
-    --muted:     #8b949e;
-    --accent:    #f78166;   /* Bengaluru traffic red-orange */
-    --accent2:   #3fb950;   /* green = low risk */
-    --warn:      #d29922;   /* amber = medium */
-    --danger:    #f85149;   /* red = high */
-    --low:       #3fb950;
-    --medium:    #d29922;
-    --high:      #f85149;
-    --mono:      'JetBrains Mono', monospace;
-    --sans:      'Inter', sans-serif;
-    --radius:    8px;
-    --shadow:    0 4px 24px rgba(0,0,0,.5);
+  /* ---- floating search bar ---- */
+  .search-wrap{
+    position:absolute;
+    top:14px; left:14px;
+    z-index:1000;
+    width:380px;
+    max-width:calc(100vw - 28px);
+  }
+  .search-card{
+    background:var(--paper);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    padding:4px;
+  }
+  .search-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+  }
+  .search-row svg{flex:none;color:var(--muted);}
+  .search-row input{
+    border:none;outline:none;flex:1;
+    font-size:14.5px;color:var(--ink);background:transparent;
+  }
+  .search-row input::placeholder{color:#9a9a9a;}
+  .divider{height:1px;background:var(--line);margin:0 8px;}
+  .time-row{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 12px;
+  }
+  .time-row svg{flex:none;color:var(--muted);}
+  .time-row input[type="datetime-local"]{
+    border:none;outline:none;flex:1;font-size:13.5px;color:var(--ink);background:transparent;font-family:inherit;
+  }
+  .now-btn{
+    border:1px solid var(--line);background:#fff;border-radius:6px;
+    font-size:12px;padding:4px 9px;color:var(--accent);cursor:pointer;white-space:nowrap;
+  }
+  .now-btn:hover{background:#f2f6ff;}
+
+  .suggestions{
+    margin-top:6px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    overflow:hidden;max-height:260px;overflow-y:auto;
+  }
+  .suggestion-item{
+    padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .suggestion-item:last-child{border-bottom:none;}
+  .suggestion-item:hover{background:#f5f7fa;}
+  .suggestion-title{font-size:13.5px;font-weight:600;}
+  .suggestion-sub{font-size:12px;color:var(--muted);}
+
+  /* ---- result / prediction card ---- */
+  .result-card{
+    margin-top:8px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:14px 16px;display:none;
+  }
+  .result-card.visible{display:block;}
+  .result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .result-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+  .risk-pill{
+    font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;color:#fff;text-transform:capitalize;
+  }
+  .risk-high{background:var(--high);}
+  .risk-medium{background:var(--medium);}
+  .risk-low{background:var(--low);}
+  .result-score{font-size:28px;font-weight:700;margin:2px 0 6px;}
+  .result-meta{font-size:12.5px;color:var(--muted);line-height:1.6;}
+  .result-meta b{color:var(--ink);font-weight:600;}
+
+  /* ---- legend ---- */
+  .legend{
+    position:absolute;bottom:18px;left:14px;z-index:1000;
+    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:10px 14px;font-size:12.5px;display:flex;gap:14px;align-items:center;
+  }
+  .legend-item{display:flex;align-items:center;gap:6px;color:var(--muted);}
+  .legend-dot{width:9px;height:9px;border-radius:50%;}
+
+  /* ---- status pill (top right) ---- */
+  .status{
+    position:absolute;top:14px;right:14px;z-index:1000;
+    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:8px 12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;
+  }
+  .status .dot{width:7px;height:7px;border-radius:50%;background:var(--low);}
+  .refresh-btn{
+    border:none;background:transparent;color:var(--accent);font-size:12px;cursor:pointer;font-weight:600;padding:0;
   }
 
-  html, body { height: 100%; font-family: var(--sans); background: var(--bg); color: var(--text); overflow: hidden; }
-
-  #map { position: fixed; inset: 0; z-index: 0; }
-
-  /* ── SIDEBAR ── */
-  #sidebar {
-    position: fixed; top: 0; left: 0; bottom: 0;
-    width: 360px; z-index: 10;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    box-shadow: var(--shadow);
-    overflow: hidden;
-  }
-
-  #sidebar-header {
-    padding: 16px 18px 12px;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  #sidebar-header h1 {
-    font-size: 13px; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--accent);
-  }
-  #sidebar-header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
-
-  #sidebar-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
-  #sidebar-body::-webkit-scrollbar { width: 4px; }
-  #sidebar-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-  /* ── SEARCH ── */
-  .search-wrap { position: relative; }
-  #search-input {
-    width: 100%; padding: 9px 12px; padding-right: 36px;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius); color: var(--text); font-size: 13px;
-    outline: none; font-family: var(--sans);
-    transition: border-color .15s;
-  }
-  #search-input:focus { border-color: var(--accent); }
-  #search-input::placeholder { color: var(--muted); }
-  #search-clear {
-    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; color: var(--muted); cursor: pointer;
-    font-size: 16px; line-height: 1; display: none;
-  }
-  #search-results {
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius); margin-top: 4px; display: none; overflow: hidden;
-  }
-  .search-result {
-    padding: 9px 12px; font-size: 12px; cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background .1s;
-  }
-  .search-result:last-child { border-bottom: none; }
-  .search-result:hover { background: var(--surface); }
-  .search-result .sr-label { font-weight: 600; color: var(--text); }
-  .search-result .sr-meta { color: var(--muted); margin-top: 2px; font-size: 11px; }
-  .score-pill {
-    display: inline-block; padding: 1px 6px; border-radius: 20px;
-    font-size: 10px; font-weight: 700; margin-left: 6px;
-    font-family: var(--mono);
-  }
-  .pill-high   { background: rgba(248,81,73,.18);  color: var(--high); }
-  .pill-medium { background: rgba(210,153,34,.18); color: var(--medium); }
-  .pill-low    { background: rgba(63,185,80,.18);  color: var(--low); }
-
-  /* ── SECTION LABEL ── */
-  .section-label {
-    font-size: 10px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
-  }
-
-  /* ── PREDICT FORM ── */
-  .form-group { display: flex; flex-direction: column; gap: 4px; }
-  .form-group label { font-size: 11px; color: var(--muted); font-weight: 500; }
-  .form-group input {
-    padding: 8px 10px; background: var(--surface2);
-    border: 1px solid var(--border); border-radius: var(--radius);
-    color: var(--text); font-size: 12px; font-family: var(--mono);
-    outline: none; transition: border-color .15s;
-  }
-  .form-group input:focus { border-color: var(--accent); }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-
-  #predict-btn {
-    padding: 9px 14px; background: var(--accent); color: #fff;
-    border: none; border-radius: var(--radius); font-size: 13px;
-    font-weight: 600; cursor: pointer; width: 100%;
-    font-family: var(--sans); transition: opacity .15s;
-  }
-  #predict-btn:hover { opacity: .88; }
-  #predict-btn:disabled { opacity: .45; cursor: not-allowed; }
-
-  /* ── RESULT CARD ── */
-  #result-card {
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 14px; display: none;
-  }
-  .result-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .risk-badge {
-    font-size: 12px; font-weight: 700; padding: 3px 10px;
-    border-radius: 20px; text-transform: uppercase; letter-spacing: .05em;
-  }
-  .risk-high   { background: rgba(248,81,73,.18);  color: var(--high); }
-  .risk-medium { background: rgba(210,153,34,.18); color: var(--medium); }
-  .risk-low    { background: rgba(63,185,80,.18);  color: var(--low); }
-  .score-big { font-family: var(--mono); font-size: 28px; font-weight: 700; }
-
-  .breakdown-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
-  }
-  .breakdown-item {
-    background: var(--surface); border-radius: 6px; padding: 8px 10px;
-  }
-  .breakdown-item .bi-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
-  .breakdown-item .bi-val   { font-size: 13px; font-weight: 600; font-family: var(--mono); }
-
-  .source-tag {
-    display: inline-block; font-size: 10px; padding: 1px 6px;
-    border-radius: 4px; background: rgba(255,255,255,.06);
-    color: var(--muted); margin-top: 4px;
-  }
-
-  /* ── DOW CHART ── */
-  #dow-section { display: none; }
-  #dow-chart { display: flex; align-items: flex-end; gap: 5px; height: 72px; margin-top: 6px; }
-  .dow-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .dow-bar {
-    width: 100%; border-radius: 3px 3px 0 0;
-    transition: height .4s ease, background .3s;
-    min-height: 3px;
-  }
-  .dow-bar-label { font-size: 9px; color: var(--muted); font-weight: 600; }
-  .dow-bar-val   { font-size: 9px; color: var(--muted); font-family: var(--mono); }
-
-  /* ── CLUSTER INFO ── */
-  #cluster-info { display: none; }
-  .cluster-stat { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-  .cluster-stat:last-child { border-bottom: none; }
-  .cluster-stat .cs-key { color: var(--muted); }
-  .cluster-stat .cs-val { font-weight: 600; font-family: var(--mono); }
-
-
-
-  /* ── DIVIDER ── */
-  .divider { height: 1px; background: var(--border); margin: 2px 0; }
-
-  /* ── LEAFLET OVERRIDES ── */
-  .leaflet-control-zoom a { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
-  .leaflet-popup-content-wrapper { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
-  .leaflet-popup-tip { background: var(--surface); }
-  .leaflet-popup-content { font-family: var(--sans); font-size: 12px; line-height: 1.6; }
-
-  /* ── CLICK MARKER ── */
-  .click-dot { width: 14px; height: 14px; background: var(--accent); border: 2px solid #fff; border-radius: 50%; }
+  .leaflet-popup-content{font-size:13px;line-height:1.5;}
+  .popup-title{font-weight:700;margin-bottom:3px;}
+  .popup-score{color:var(--high);font-weight:700;}
 </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- SIDEBAR -->
-<div id="sidebar">
-  <div id="sidebar-header">
-    <h1>Bengaluru Hotspot Intel</h1>
-    <p>Parking violation congestion · Jan–May dataset</p>
+<div class="search-wrap">
+  <div class="search-card">
+    <div class="search-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="Search a location in Bengaluru" autocomplete="off" />
+    </div>
+    <div class="divider"></div>
+    <div class="time-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14.5"/></svg>
+      <input id="timeInput" type="datetime-local" />
+      <button class="now-btn" id="nowBtn">Now</button>
+    </div>
   </div>
 
-  <div id="sidebar-body">
+  <div class="suggestions" id="suggestions" style="display:none;"></div>
 
-    <!-- SEARCH -->
-    <div>
-      <div class="section-label">Search location</div>
-      <div class="search-wrap">
-        <input id="search-input" type="text" placeholder="Junction, police station, area…" autocomplete="off" />
-        <button id="search-clear">✕</button>
-      </div>
-      <div id="search-results"></div>
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <span class="result-title" id="resultLocationName">Selected location</span>
+      <span class="risk-pill" id="riskPill">—</span>
     </div>
-
-    <div class="divider"></div>
-
-    <!-- PREDICT FORM -->
-    <div>
-      <div class="section-label">Predict congestion impact</div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Latitude</label>
-            <input id="inp-lat" type="number" step="any" placeholder="12.9716" />
-          </div>
-          <div class="form-group">
-            <label>Longitude</label>
-            <input id="inp-lng" type="number" step="any" placeholder="77.5946" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Date</label>
-            <input id="inp-date" type="date" />
-          </div>
-          <div class="form-group">
-            <label>Time</label>
-            <input id="inp-time" type="time" value="09:00" />
-          </div>
-        </div>
-        <button id="predict-btn">Predict impact →</button>
-      </div>
-    </div>
-
-    <!-- RESULT CARD -->
-    <div id="result-card">
-      <div class="result-top">
-        <div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Congestion Impact</div>
-          <div class="score-big" id="res-score">—</div>
-        </div>
-        <div id="res-badge" class="risk-badge">—</div>
-      </div>
-
-      <div class="breakdown-grid">
-        <div class="breakdown-item">
-          <div class="bi-label">Severity</div>
-          <div class="bi-val" id="res-severity">—</div>
-          <div class="source-tag" id="res-sev-src">—</div>
-        </div>
-        <div class="breakdown-item">
-          <div class="bi-label">Activity factor</div>
-          <div class="bi-val" id="res-activity">—</div>
-          <div class="source-tag" id="res-act-src">—</div>
-        </div>
-        <div class="breakdown-item">
-          <div class="bi-label">Day of week</div>
-          <div class="bi-val" id="res-dow">—</div>
-          <div class="source-tag" id="res-dow-w">—</div>
-        </div>
-        <div class="breakdown-item">
-          <div class="bi-label">Nearest cluster</div>
-          <div class="bi-val" id="res-cluster">—</div>
-          <div class="source-tag" id="res-dist">—</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DOW CHART -->
-    <div id="dow-section">
-      <div class="section-label">Weekly impact pattern</div>
-      <div id="dow-chart"></div>
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- CLUSTER DETAIL -->
-    <div id="cluster-info">
-      <div class="section-label" id="cluster-info-title">Selected cluster</div>
-      <div id="cluster-stats-list"></div>
-    </div>
-
+    <div class="result-score" id="resultScore">—</div>
+    <div class="result-meta" id="resultMeta"></div>
   </div>
 </div>
 
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High risk</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--medium)"></span>Medium</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low</div>
+</div>
+
+<div class="status">
+  <span class="dot"></span>
+  <span id="statusText">Loading…</span>
+  <button class="refresh-btn" id="refreshBtn">Refresh</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ─────────────────────────────────────────────
-// MAP SETUP
-// ─────────────────────────────────────────────
-const map = L.map('map', { zoomControl: true }).setView([12.9716, 77.5946], 12);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '© OpenStreetMap © CARTO',
-  subdomains: 'abcd', maxZoom: 20,
+const API = ""; // same origin
+
+const map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19
 }).addTo(map);
 
-let heatLayer   = null;
-let markerLayer = L.layerGroup().addTo(map);
-let clickMarker = null;
-let allClusters = [];
+let clusterMarkers = [];
+let queryMarker = null;
 
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
-function riskColor(score) {
-  if (score >= 0.45) return '#f85149';
-  if (score >= 0.25) return '#d29922';
-  return '#3fb950';
+function riskColor(score){
+  if(score >= 0.45) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
+  if(score >= 0.25) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
+  return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
 }
-function riskClass(level) {
-  return { high: 'risk-high', medium: 'risk-medium', low: 'risk-low' }[level] || 'risk-low';
-}
-function pillClass(score) {
-  if (score >= 0.45) return 'pill-high';
-  if (score >= 0.25) return 'pill-medium';
-  return 'pill-low';
-}
-function fmt(v) { return typeof v === 'number' ? v.toFixed(3) : v ?? '—'; }
-
-// ─────────────────────────────────────────────
-// LOAD CLUSTERS
-// ─────────────────────────────────────────────
-async function loadClusters() {
-  try {
-    const r = await fetch('/api/clusters');
-    const d = await r.json();
-    allClusters = d.clusters || [];
-    renderMap(allClusters);
-  } catch(e) {
-    console.error('Failed to load clusters', e);
-  }
+function riskLabel(score){
+  if(score >= 0.45) return 'high';
+  if(score >= 0.25) return 'medium';
+  return 'low';
 }
 
-function renderMap(clusters) {
-  markerLayer.clearLayers();
-  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
-  if (!clusters.length) return;
+async function loadClusters(){
+  const res = await fetch(`${API}/api/clusters`);
+  const data = await res.json();
+  clusterMarkers.forEach(m => map.removeLayer(m));
+  clusterMarkers = [];
 
-  // heatmap — boosted opacity and radius for visibility
-  const heat = clusters.map(c => [c.latitude, c.longitude, c.cluster_score]);
-  heatLayer = L.heatLayer(heat, {
-    radius: 50, blur: 30, maxZoom: 17, minOpacity: 0.55,
-    gradient: { 0.0: '#3fb950', 0.4: '#d29922', 0.7: '#f85149', 1.0: '#ff0000' }
-  }).addTo(map);
+  data.clusters.forEach(c => {
+    const color = riskColor(c.avg_impact);
+    const radius = Math.min(22, 6 + Math.sqrt(c.violations));
+    const marker = L.circleMarker([c.latitude, c.longitude], {
+      radius, color, fillColor: color, fillOpacity: 0.55, weight: 1.5
+    }).addTo(map);
 
-  // circle markers — more opaque and larger so they're clearly visible
-  clusters.forEach(c => {
-    const col = riskColor(c.avg_impact);
-    const r   = 10 + c.cluster_score * 18;
-    const m = L.circleMarker([c.latitude, c.longitude], {
-      radius: r, color: col, weight: 2,
-      fillColor: col, fillOpacity: 0.65,
-    }).addTo(markerLayer);
-
-    m.bindPopup(`
-      <b>${c.location || c.police_station || 'Cluster ' + c.cluster_id}</b><br/>
-      Violations: <b>${c.violations}</b><br/>
-      Avg impact: <b>${fmt(c.avg_impact)}</b><br/>
-      Cluster score: <b>${fmt(c.cluster_score)}</b><br/>
-      ${c.junction_name && c.junction_name !== 'No Junction' ? 'Junction: ' + c.junction_name + '<br/>' : ''}
-      ${c.police_station ? 'Station: ' + c.police_station : ''}
+    marker.bindPopup(`
+      <div class="popup-title">${c.location || c.police_station}</div>
+      <div>Police station: <b>${c.police_station}</b></div>
+      <div>Junction: <b>${c.junction_name || '—'}</b></div>
+      <div>Violations recorded: <b>${c.violations}</b></div>
+      <div>Avg severity: <span class="popup-score">${c.avg_impact}</span></div>
     `);
+    clusterMarkers.push(marker);
+  });
 
-    m.on('click', () => showClusterInfo(c));
+  document.getElementById('statusText').textContent =
+    `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
+}
+
+async function refreshData(){
+  document.getElementById('statusText').textContent = 'Refreshing…';
+  await fetch(`${API}/api/refresh`, { method: 'POST' });
+  await loadClusters();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
+
+// ---- time input default ----
+const timeInput = document.getElementById('timeInput');
+function setNow(){
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  timeInput.value = now.toISOString().slice(0,16);
+}
+setNow();
+document.getElementById('nowBtn').addEventListener('click', setNow);
+
+// ---- search / geocode ----
+const searchInput = document.getElementById('searchInput');
+const suggestionsEl = document.getElementById('suggestions');
+let searchDebounce = null;
+let selectedLocation = null; // {lat, lng, label}
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
+  const q = searchInput.value.trim();
+  if(q.length < 2){ suggestionsEl.style.display = 'none'; return; }
+  searchDebounce = setTimeout(async () => {
+    const res = await fetch(`${API}/api/geocode?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    renderSuggestions(data.results);
+  }, 200);
+});
+
+function renderSuggestions(results){
+  if(!results.length){ suggestionsEl.style.display = 'none'; return; }
+  suggestionsEl.innerHTML = results.map((r,i) => `
+    <div class="suggestion-item" data-idx="${i}">
+      <div class="suggestion-title">${r.label}</div>
+      <div class="suggestion-sub">${r.police_station}${r.junction_name && r.junction_name !== 'No Junction' ? ' · ' + r.junction_name : ''}</div>
+    </div>
+  `).join('');
+  suggestionsEl.style.display = 'block';
+  [...suggestionsEl.querySelectorAll('.suggestion-item')].forEach((el, i) => {
+    el.addEventListener('click', () => {
+      const r = results[i];
+      selectedLocation = { lat: r.latitude, lng: r.longitude, label: r.label };
+      searchInput.value = r.label;
+      suggestionsEl.style.display = 'none';
+      map.flyTo([r.latitude, r.longitude], 15, { duration: 0.6 });
+      runPrediction();
+    });
   });
 }
 
-// ─────────────────────────────────────────────
-// SHOW CLUSTER INFO + DOW CHART
-// ─────────────────────────────────────────────
-function showClusterInfo(c) {
-  document.getElementById('cluster-info').style.display = 'block';
-  document.getElementById('cluster-info-title').textContent =
-    c.location || c.police_station || `Cluster ${c.cluster_id}`;
-
-  const list = document.getElementById('cluster-stats-list');
-  list.innerHTML = `
-    <div class="cluster-stat"><span class="cs-key">Violations</span><span class="cs-val">${c.violations}</span></div>
-    <div class="cluster-stat"><span class="cs-key">Avg impact</span><span class="cs-val">${fmt(c.avg_impact)}</span></div>
-    <div class="cluster-stat"><span class="cs-key">Cluster score</span><span class="cs-val">${fmt(c.cluster_score)}</span></div>
-    <div class="cluster-stat"><span class="cs-key">Junction</span><span class="cs-val">${c.junction_name || '—'}</span></div>
-    <div class="cluster-stat"><span class="cs-key">Police station</span><span class="cs-val">${c.police_station || '—'}</span></div>
-  `;
-
-  // set lat/lng in predict form
-  document.getElementById('inp-lat').value = c.latitude.toFixed(6);
-  document.getElementById('inp-lng').value = c.longitude.toFixed(6);
-
-  renderDowChart(c.dow_profile || {});
-}
-
-function renderDowChart(profile) {
-  const section = document.getElementById('dow-section');
-  const chart   = document.getElementById('dow-chart');
-  const days    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-
-  if (!Object.keys(profile).length) {
-    section.style.display = 'none';
-    return;
-  }
-  section.style.display = 'block';
-
-  // profile keys may be integer (0-6) or name strings — normalise to names
-  const byName = {};
-  for (const [k, v] of Object.entries(profile)) {
-    const idx = parseInt(k);
-    const name = isNaN(idx) ? k : days[idx];
-    if (name) byName[name] = v;
-  }
-
-  const vals  = days.map(d => byName[d] ?? 0);
-  const maxV  = Math.max(...vals, 0.001);
-
-  chart.innerHTML = days.map((d, i) => {
-    const v   = vals[i];
-    const pct = Math.round((v / maxV) * 100);
-    const col = riskColor(v);
-    return `
-      <div class="dow-bar-wrap">
-        <div class="dow-bar-val">${v > 0 ? v.toFixed(2) : ''}</div>
-        <div class="dow-bar" style="height:${Math.max(pct * 0.56, 3)}px;background:${col}"></div>
-        <div class="dow-bar-label">${d}</div>
-      </div>`;
-  }).join('');
-}
-
-// ─────────────────────────────────────────────
-// MAP CLICK → fill lat/lng
-// ─────────────────────────────────────────────
-map.on('click', e => {
-  const { lat, lng } = e.latlng;
-  document.getElementById('inp-lat').value = lat.toFixed(6);
-  document.getElementById('inp-lng').value = lng.toFixed(6);
-
-  if (clickMarker) map.removeLayer(clickMarker);
-  clickMarker = L.marker([lat, lng], {
-    icon: L.divIcon({ className: '', html: '<div class="click-dot"></div>', iconSize: [14,14], iconAnchor:[7,7] })
-  }).addTo(map);
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.search-wrap')) suggestionsEl.style.display = 'none';
 });
 
-// ─────────────────────────────────────────────
-// SEARCH
-// ─────────────────────────────────────────────
-const searchInput   = document.getElementById('search-input');
-const searchResults = document.getElementById('search-results');
-const searchClear   = document.getElementById('search-clear');
-let searchTimer = null;
+// click anywhere on the map to query that point
+map.on('click', (e) => {
+  selectedLocation = { lat: e.latlng.lat, lng: e.latlng.lng, label: `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}` };
+  searchInput.value = selectedLocation.label;
+  runPrediction();
+});
+
+timeInput.addEventListener('change', () => { if(selectedLocation) runPrediction(); });
+
+async function runPrediction(){
+  if(!selectedLocation) return;
+  const when = timeInput.value; // already local ISO-ish
+  const url = `${API}/api/predict?lat=${selectedLocation.lat}&lng=${selectedLocation.lng}&when=${encodeURIComponent(when)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  showResult(selectedLocation.label, data);
+
+  if(queryMarker) map.removeLayer(queryMarker);
+  queryMarker = L.marker([selectedLocation.lat, selectedLocation.lng]).addTo(map);
+}
+
+function showResult(label, data){
+  const card = document.getElementById('resultCard');
+  card.classList.add('visible');
+  document.getElementById('resultLocationName').textContent = label;
+
+  const pill = document.getElementById('riskPill');
+  pill.textContent = data.risk_level;
+  pill.className = `risk-pill risk-${data.risk_level}`;
+
+  document.getElementById('resultScore').textContent = data.predicted_score;
+
+  let meta = `Severity profile: <b>${data.severity_score}</b> (${data.severity_source.replace('_',' ')})<br>`;
+  meta += `Activity likelihood: <b>${data.activity_factor}</b> (${data.activity_source.replace('_',' ')})<br>`;
+  if(data.nearest_cluster_id !== null && data.nearest_cluster_id !== undefined){
+    meta += `Nearest known hotspot: <b>${Math.round(data.nearest_cluster_distance_m)}m</b> away`;
+    if(data.historical_sample_size > 0) meta += ` · ${data.historical_sample_size} past records at this time slot`;
+  } else {
+    meta += `No known hotspot nearby — estimate from city-wide model`;
+  }
+  document.getElementById('resultMeta').innerHTML = meta;
+}
+
+// initial load
+loadClusters();
+</script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bengaluru Parking Hotspots</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root{
+    --ink:#1a1a1a;
+    --paper:#ffffff;
+    --line:#e3e3e3;
+    --muted:#6b6b6b;
+    --high:#d6463a;
+    --medium:#e0a02e;
+    --low:#3b8f5c;
+    --accent:#1f6feb;
+    --shadow: 0 1px 2px rgba(0,0,0,0.08), 0 4px 14px rgba(0,0,0,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);}
+  #map{position:absolute;inset:0;z-index:0;}
+
+  /* ---- floating search bar ---- */
+  .search-wrap{
+    position:absolute;
+    top:14px; left:14px;
+    z-index:1000;
+    width:380px;
+    max-width:calc(100vw - 28px);
+  }
+  .search-card{
+    background:var(--paper);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+    padding:4px;
+  }
+  .search-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+  }
+  .search-row svg{flex:none;color:var(--muted);}
+  .search-row input{
+    border:none;outline:none;flex:1;
+    font-size:14.5px;color:var(--ink);background:transparent;
+  }
+  .search-row input::placeholder{color:#9a9a9a;}
+  .divider{height:1px;background:var(--line);margin:0 8px;}
+  .time-row{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 12px;
+  }
+  .time-row svg{flex:none;color:var(--muted);}
+  .time-row input[type="datetime-local"]{
+    border:none;outline:none;flex:1;font-size:13.5px;color:var(--ink);background:transparent;font-family:inherit;
+  }
+  .now-btn{
+    border:1px solid var(--line);background:#fff;border-radius:6px;
+    font-size:12px;padding:4px 9px;color:var(--accent);cursor:pointer;white-space:nowrap;
+  }
+  .now-btn:hover{background:#f2f6ff;}
+
+  .suggestions{
+    margin-top:6px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    overflow:hidden;max-height:260px;overflow-y:auto;
+  }
+  .suggestion-item{
+    padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);
+    display:flex;flex-direction:column;gap:2px;
+  }
+  .suggestion-item:last-child{border-bottom:none;}
+  .suggestion-item:hover{background:#f5f7fa;}
+  .suggestion-title{font-size:13.5px;font-weight:600;}
+  .suggestion-sub{font-size:12px;color:var(--muted);}
+
+  /* ---- result / prediction card ---- */
+  .result-card{
+    margin-top:8px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:14px 16px;display:none;
+  }
+  .result-card.visible{display:block;}
+  .result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .result-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+  .risk-pill{
+    font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;color:#fff;text-transform:capitalize;
+  }
+  .risk-high{background:var(--high);}
+  .risk-medium{background:var(--medium);}
+  .risk-low{background:var(--low);}
+  .result-score{font-size:28px;font-weight:700;margin:2px 0 6px;}
+  .result-meta{font-size:12.5px;color:var(--muted);line-height:1.6;}
+  .result-meta b{color:var(--ink);font-weight:600;}
+
+  /* ---- legend ---- */
+  .legend{
+    position:absolute;bottom:18px;left:14px;z-index:1000;
+    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:10px 14px;font-size:12.5px;display:flex;gap:14px;align-items:center;
+  }
+  .legend-item{display:flex;align-items:center;gap:6px;color:var(--muted);}
+  .legend-dot{width:9px;height:9px;border-radius:50%;}
+
+  /* ---- status pill (top right) ---- */
+  .status{
+    position:absolute;top:14px;right:14px;z-index:1000;
+    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:8px 12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;
+  }
+  .status .dot{width:7px;height:7px;border-radius:50%;background:var(--low);}
+  .refresh-btn{
+    border:none;background:transparent;color:var(--accent);font-size:12px;cursor:pointer;font-weight:600;padding:0;
+  }
+
+  .leaflet-popup-content{font-size:13px;line-height:1.5;}
+  .popup-title{font-weight:700;margin-bottom:3px;}
+  .popup-score{color:var(--high);font-weight:700;}
+
+  /* ---- layer toggle panel (top right, below status) ---- */
+  .layer-panel{
+    position:absolute;top:64px;right:14px;z-index:1000;
+    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    padding:12px 16px;display:flex;flex-direction:column;gap:10px;
+  }
+  .layer-panel .layer-title{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:700;margin-bottom:2px;}
+  .layer-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14.5px;font-weight:600;}
+  .layer-toggle input[type="checkbox"]{width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--accent);}
+
+  /* ---- per-cluster soft heat glow (replaces additive L.heatLayer) ---- */
+  .heat-glow{
+    border-radius:50%;
+    /* color set inline per cluster; soft radial falloff like a heatmap blob */
+    filter: blur(6px);
+    opacity:0.55;
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="search-wrap">
+  <div class="search-card">
+    <div class="search-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="Search a location in Bengaluru" autocomplete="off" />
+    </div>
+    <div class="divider"></div>
+    <div class="time-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14.5"/></svg>
+      <input id="timeInput" type="datetime-local" />
+      <button class="now-btn" id="nowBtn">Now</button>
+    </div>
+  </div>
+
+  <div class="suggestions" id="suggestions" style="display:none;"></div>
+
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <span class="result-title" id="resultLocationName">Selected location</span>
+      <span class="risk-pill" id="riskPill">—</span>
+    </div>
+    <div class="result-score" id="resultScore">—</div>
+    <div class="result-meta" id="resultMeta"></div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High risk</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--medium)"></span>Medium</div>
+  <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low</div>
+</div>
+
+<div class="layer-panel">
+  <div class="layer-title">Layers</div>
+  <label class="layer-toggle">
+    <input type="checkbox" id="heatToggle" checked />
+    Heatmap
+  </label>
+  <label class="layer-toggle">
+    <input type="checkbox" id="markersToggle" checked />
+    Markers
+  </label>
+</div>
+<div class="status">
+  <span class="dot"></span>
+  <span id="statusText">Loading…</span>
+  <button class="refresh-btn" id="refreshBtn">Refresh</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js';"></script>
+<script>
+const API = ""; // same origin
+
+const map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19
+}).addTo(map);
+
+let clusterMarkers = [];
+let queryMarker = null;
+let heatLayer = null;
+
+function riskColor(score){
+  // if(score >= 0.45) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
+  // if(score >= 0.25) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
+  // return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
+  // if(score >= 0.4) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
+  if(score >= 0.35) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
+  // if(score >= 0.15) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
+  if(score >= 0.12) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
+  return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
+}
+function riskLabel(score){
+  // if(score >= 0.45) return 'high';
+  // if(score >= 0.25) return 'medium';
+  // return 'low';
+  // if(score >= 0.4) return 'high';
+  if(score >= 0.35) return 'high';
+  // if(score >= 0.15) return 'medium';
+  if(score >= 0.12) return 'medium';
+  return 'low';
+}
+
+async function loadClusters(){
+  const whenParam = timeInput && timeInput.value ? `?when=${encodeURIComponent(timeInput.value)}` : '';
+  const res = await fetch(`${API}/api/clusters${whenParam}`);
+  const data = await res.json();
+  clusterMarkers.forEach(m => map.removeLayer(m));
+  clusterMarkers = [];
+
+  if(heatLayer){ map.removeLayer(heatLayer); heatLayer = null; }
+
+  // const maxScore = Math.max(...data.clusters.map(c => c.cluster_score), 0.001);
+  const maxScore = Math.max(...data.clusters.map(c => c.predicted_score), 0.001);
+  // const heatPoints = [];
+  heatLayer = L.layerGroup();  // per-cluster glow circles, colored like markers, no additive saturation
+
+  data.clusters.forEach(c => {
+    // const color = riskColor(c.avg_impact);
+    const color = riskColor(c.predicted_score);
+    const radius = Math.min(22, 6 + Math.sqrt(c.violations));
+    const marker = L.circleMarker([c.latitude, c.longitude], {
+      radius, color, fillColor: color, fillOpacity: 0.55, weight: 1.5
+    }).addTo(map);
+
+    marker.bindPopup(`
+      <div class="popup-title">${c.location || c.police_station}</div>
+      <div>Police station: <b>${c.police_station}</b></div>
+      <div>Junction: <b>${c.junction_name || '—'}</b></div>
+      <div>Violations recorded: <b>${c.violations}</b></div>
+      <div>Predicted impact (at selected time): <span class="popup-score">${c.predicted_score}</span></div>
+      <div>Avg severity: <span class="popup-score">${c.avg_impact}</span></div>
+    `);
+    marker.on('click', () => {
+      selectedLocation = { lat: c.latitude, lng: c.longitude, label: c.location || c.police_station };
+      searchInput.value = selectedLocation.label;
+      runPrediction();
+    });
+    clusterMarkers.push(marker);
+
+    // normalize cluster_score to 0-1 for heat intensity, weighted toward severity not just volume
+    // const intensity = Math.max(0.4, c.cluster_score / maxScore);
+    // const intensity = Math.max(0.4, c.predicted_score / maxScore);
+    // const intensity = Math.max(0.05, Math.min(1, c.predicted_score));
+    // OLD additive L.heatLayer approach (saturated to red on overlap):
+    // const intensity = c.predicted_score >= 0.4 ? 1.0 : (c.predicted_score >= 0.15 ? 0.55 : 0.18);
+    // heatPoints.push([c.latitude, c.longitude, intensity]);
+
+    // NEW: one soft glow disc per cluster, colored by the SAME riskColor() the markers use.
+    // Size scales a little with violations; color updates with time exactly like the markers.
+    const glowPx = 38 + Math.min(34, Math.sqrt(c.violations));
+    const glowIcon = L.divIcon({
+      className: '',
+      html: `<div class="heat-glow" style="width:${glowPx}px;height:${glowPx}px;background:radial-gradient(circle, ${color} 0%, ${color} 35%, transparent 72%);"></div>`,
+      iconSize: [glowPx, glowPx],
+      iconAnchor: [glowPx/2, glowPx/2],
+    });
+    L.marker([c.latitude, c.longitude], { icon: glowIcon, interactive: false }).addTo(heatLayer);
+  });
+
+    // if(typeof L.heatLayer !== 'function'){
+    // console.error('L.heatLayer is not available — the leaflet.heat plugin failed to load. Heatmap will be skipped; markers still work.');
+    // document.getElementById('heatToggle').disabled = true;
+    // document.getElementById('heatToggle').checked = false;
+    // document.getElementById('statusText').textContent =
+    // `${data.clusters.length} hotspots (heatmap plugin failed to load — markers only) · ${new Date(data.last_loaded).toLocaleTimeString()}`;
+    // } else {
+    // heatLayer = L.heatLayer(heatPoints, {
+    // // radius: 18, blur: 14, maxZoom: 17, minOpacity: 0.55,
+    // // gradient: { 0.0: '#3b8f5c', 0.35: '#d29922', 0.6: '#d6463a', 0.85: '#a8281f', 1.0: '#7a1410' }
+    // // radius: 20, blur: 16, maxZoom: 17, minOpacity: 0.75,
+    // // gradient: { 0.0: '#2d6b46', 0.3: '#b8821a', 0.55: '#b8362c', 0.8: '#7a1410', 1.0: '#4a0a08' }
+    // // radius: 22, blur: 18, maxZoom: 17, minOpacity: 0.45,
+    // // gradient: { 0.0: '#3b8f5c', 0.3: '#7fae3e', 0.5: '#d29922', 0.7: '#d6463a', 1.0: '#921f17' }
+    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55,
+    // // gradient: { 0.0: '#3b8f5c', 0.3: '#7fae3e', 0.5: '#d29922', 0.7: '#d6463a', 1.0: '#921f17' }
+    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55,
+    // // gradient: { 0.0: '#3b8f5c', 0.12: '#7fae3e', 0.25: '#d29922', 0.4: '#d6463a', 0.6: '#921f17' }
+    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55,
+    // // gradient: { 0.0: '#3b8f5c', 0.15: '#7fae3e', 0.28: '#d29922', 0.4: '#d6463a', 0.6: '#921f17' }
+    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55, max: 1,
+    // // gradient: { 0.0: '#3b8f5c', 0.15: '#7fae3e', 0.28: '#d29922', 0.4: '#d6463a', 0.6: '#921f17' }
+    // // radius: 15, blur: 12, maxZoom: 19, minOpacity: 0.5, max: 0.5,
+    // // gradient: { 0.0: '#3b8f5c', 0.3: '#7fae3e', 0.56: '#d29922', 0.8: '#d6463a', 1.0: '#921f17' }
+    // radius: 22,
+    // blur: 18,
+    // maxZoom: 19,
+    // minOpacity: 0.5,
+    // max: 2,
+    // gradient: { 0.0: '#3b8f5c', 0.17: '#3b8f5c', 0.18: '#d29922', 0.54: '#d29922', 0.55: '#d6463a', 1.0: '#d6463a' }
+    // });
+    // if(document.getElementById('heatToggle').checked) heatLayer.addTo(map);
+    // document.getElementById('statusText').textContent =
+    // `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
+    // }
+  // NEW glow-group render (replaces additive L.heatLayer block above):
+  if(document.getElementById('heatToggle').checked) heatLayer.addTo(map);
+  document.getElementById('statusText').textContent =
+    `${data.clusters.length} hotspots \u00b7 updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
+
+  clusterMarkers.forEach(m => {
+    if(!document.getElementById('markersToggle').checked) map.removeLayer(m);
+  });
+}
+
+document.getElementById('heatToggle').addEventListener('change', (e) => {
+  if(!heatLayer) return;
+  if(e.target.checked) heatLayer.addTo(map);
+  else map.removeLayer(heatLayer);
+});
+
+document.getElementById('markersToggle').addEventListener('change', (e) => {
+  clusterMarkers.forEach(m => {
+    if(e.target.checked) m.addTo(map);
+    else map.removeLayer(m);
+  });
+});
+
+async function refreshData(){
+  document.getElementById('statusText').textContent = 'Refreshing…';
+  await fetch(`${API}/api/refresh`, { method: 'POST' });
+  await loadClusters();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
+
+// ---- time input default ----
+const timeInput = document.getElementById('timeInput');
+function setNow(){
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  timeInput.value = now.toISOString().slice(0,16);
+}
+setNow();
+// document.getElementById('nowBtn').addEventListener('click', setNow);
+document.getElementById('nowBtn').addEventListener('click', () => {
+  setNow();
+  loadClusters();
+  if(selectedLocation) runPrediction();
+});
+
+// ---- search / geocode ----
+const searchInput = document.getElementById('searchInput');
+const suggestionsEl = document.getElementById('suggestions');
+let searchDebounce = null;
+let selectedLocation = null; // {lat, lng, label}
 
 searchInput.addEventListener('input', () => {
+  clearTimeout(searchDebounce);
   const q = searchInput.value.trim();
-  searchClear.style.display = q ? 'block' : 'none';
-  clearTimeout(searchTimer);
-  if (q.length < 2) { searchResults.style.display = 'none'; return; }
-  searchTimer = setTimeout(() => doSearch(q), 280);
+  if(q.length < 2){ suggestionsEl.style.display = 'none'; return; }
+  searchDebounce = setTimeout(async () => {
+    const res = await fetch(`${API}/api/geocode?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    renderSuggestions(data.results);
+  }, 200);
 });
 
-searchClear.addEventListener('click', () => {
-  searchInput.value = '';
-  searchClear.style.display = 'none';
-  searchResults.style.display = 'none';
-});
-
-async function doSearch(q) {
-  try {
-    const r = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-    const d = await r.json();
-    const results = d.results || [];
-    if (!results.length) { searchResults.style.display = 'none'; return; }
-
-    searchResults.innerHTML = results.map(m => `
-      <div class="search-result" data-lat="${m.latitude}" data-lng="${m.longitude}" data-cid="${m.cluster_id}">
-        <div class="sr-label">${m.label || m.police_station || 'Cluster ' + m.cluster_id}
-          <span class="score-pill ${pillClass(m.cluster_score)}">${m.cluster_score}</span>
-        </div>
-        <div class="sr-meta">${m.junction_name || ''} ${m.police_station ? '· ' + m.police_station : ''}</div>
-      </div>
-    `).join('');
-    searchResults.style.display = 'block';
-
-    searchResults.querySelectorAll('.search-result').forEach(el => {
-      el.addEventListener('click', () => {
-        const lat = parseFloat(el.dataset.lat);
-        const lng = parseFloat(el.dataset.lng);
-        const cid = parseInt(el.dataset.cid);
-        map.flyTo([lat, lng], 16);
-        document.getElementById('inp-lat').value = lat.toFixed(6);
-        document.getElementById('inp-lng').value = lng.toFixed(6);
-        searchResults.style.display = 'none';
-        const cluster = allClusters.find(c => c.cluster_id === cid);
-        if (cluster) showClusterInfo(cluster);
-      });
+function renderSuggestions(results){
+  if(!results.length){ suggestionsEl.style.display = 'none'; return; }
+  suggestionsEl.innerHTML = results.map((r,i) => `
+    <div class="suggestion-item" data-idx="${i}">
+      <div class="suggestion-title">${r.label}</div>
+      <div class="suggestion-sub">${r.police_station}${r.junction_name && r.junction_name !== 'No Junction' ? ' · ' + r.junction_name : ''}</div>
+    </div>
+  `).join('');
+  suggestionsEl.style.display = 'block';
+  [...suggestionsEl.querySelectorAll('.suggestion-item')].forEach((el, i) => {
+    el.addEventListener('click', () => {
+      const r = results[i];
+      selectedLocation = { lat: r.latitude, lng: r.longitude, label: r.label };
+      searchInput.value = r.label;
+      suggestionsEl.style.display = 'none';
+      map.flyTo([r.latitude, r.longitude], 15, { duration: 0.6 });
+      runPrediction();
     });
-  } catch(e) { searchResults.style.display = 'none'; }
+  });
 }
 
-// ─────────────────────────────────────────────
-// PREDICT
-// ─────────────────────────────────────────────
-// Set default date to today
-const today = new Date();
-document.getElementById('inp-date').value = today.toISOString().slice(0,10);
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.search-wrap')) suggestionsEl.style.display = 'none';
+});
 
-document.getElementById('predict-btn').addEventListener('click', predict);
+// click anywhere on the map to query that point
+map.on('click', (e) => {
+  selectedLocation = { lat: e.latlng.lat, lng: e.latlng.lng, label: `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}` };
+  searchInput.value = selectedLocation.label;
+  runPrediction();
+});
 
-async function predict() {
-  const lat  = parseFloat(document.getElementById('inp-lat').value);
-  const lng  = parseFloat(document.getElementById('inp-lng').value);
-  const date = document.getElementById('inp-date').value;
-  const time = document.getElementById('inp-time').value;
+// timeInput.addEventListener('change', () => { if(selectedLocation) runPrediction(); });
+timeInput.addEventListener('change', () => {
+  if(selectedLocation) runPrediction();
+  loadClusters();
+});
 
-  if (isNaN(lat) || isNaN(lng)) {
-    alert('Click the map or enter lat/lng first.');
-    return;
-  }
+async function runPrediction(){
+  if(!selectedLocation) return;
+  const when = timeInput.value; // already local ISO-ish
+  const url = `${API}/api/predict?lat=${selectedLocation.lat}&lng=${selectedLocation.lng}&when=${encodeURIComponent(when)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  showResult(selectedLocation.label, data);
 
-  const when  = date && time ? `${date}T${time}` : new Date().toISOString().slice(0,16);
-  const btn   = document.getElementById('predict-btn');
-  btn.disabled = true;
-  btn.textContent = 'Predicting…';
-
-  try {
-    const r = await fetch(`/api/predict?lat=${lat}&lng=${lng}&when=${encodeURIComponent(when)}`);
-    const d = await r.json();
-    showResult(d);
-  } catch(e) {
-    alert('Prediction failed. Is the server running?');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Predict impact →';
-  }
+  if(queryMarker) map.removeLayer(queryMarker);
+  queryMarker = L.marker([selectedLocation.lat, selectedLocation.lng]).addTo(map);
 }
 
-function showResult(d) {
-  const card = document.getElementById('result-card');
-  card.style.display = 'block';
+function showResult(label, data){
+  const card = document.getElementById('resultCard');
+  card.classList.add('visible');
+  document.getElementById('resultLocationName').textContent = label;
 
-  const score = d.predicted_score ?? 0;
-  const level = d.risk_level ?? 'low';
-  const col   = riskColor(score);
+  const pill = document.getElementById('riskPill');
+  pill.textContent = data.risk_level;
+  pill.className = `risk-pill risk-${data.risk_level}`;
 
-  document.getElementById('res-score').textContent   = score.toFixed(3);
-  document.getElementById('res-score').style.color   = col;
-  const badge = document.getElementById('res-badge');
-  badge.textContent  = level.toUpperCase();
-  badge.className    = `risk-badge ${riskClass(level)}`;
+  document.getElementById('resultScore').textContent = data.predicted_score;
 
-  document.getElementById('res-severity').textContent  = fmt(d.severity_score);
-  document.getElementById('res-sev-src').textContent   = d.severity_source ?? '—';
-  document.getElementById('res-activity').textContent  = fmt(d.activity_factor);
-  document.getElementById('res-act-src').textContent   = d.activity_source ?? '—';
-  document.getElementById('res-dow').textContent       = d.dow_name ?? '—';
-  document.getElementById('res-dow-w').textContent     = `weight ${d.dow_weight ?? '—'}`;
-  document.getElementById('res-cluster').textContent   =
-    d.nearest_cluster_id != null ? `#${d.nearest_cluster_id}` : 'None nearby';
-  document.getElementById('res-dist').textContent      =
-    d.nearest_cluster_dist_m != null ? `${d.nearest_cluster_dist_m}m` : '> 300m';
-
-  // DOW profile from prediction response
-  if (d.dow_profile && Object.keys(d.dow_profile).length) {
-    renderDowChart(d.dow_profile);
+  let meta = `Severity profile: <b>${data.severity_score}</b> (${data.severity_source.replace('_',' ')})<br>`;
+  meta += `Activity likelihood: <b>${data.activity_factor}</b> (${data.activity_source.replace('_',' ')})<br>`;
+  if(data.nearest_cluster_id !== null && data.nearest_cluster_id !== undefined){
+    meta += `Nearest known hotspot: <b>${Math.round(data.nearest_cluster_dist_m)}m</b> away`;
+    if(data.historical_sample_size > 0) meta += ` · ${data.historical_sample_size} past records at this time slot`;
+  } else {
+    meta += `No known hotspot nearby — estimate from city-wide model`;
   }
-
-  // scroll result into view
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('resultMeta').innerHTML = meta;
 }
 
-// ─────────────────────────────────────────────
-// STATUS + REFRESH
-// ─────────────────────────────────────────────
-
-
-// ─────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────
+// initial load
 loadClusters();
 </script>
 </body>

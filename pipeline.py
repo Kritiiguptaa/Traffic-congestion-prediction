@@ -260,7 +260,7 @@ def build_cluster_stats(df: pd.DataFrame) -> pd.DataFrame:
         # Pivot to wide dict per cluster: {0: 0.45, 1: 0.52, ...}
         dow_dict = (
             dow_profile.groupby("cluster_id")
-            .apply(lambda g: dict(zip(g["dow"].astype(int), g["avg_impact"].round(3))))
+            .apply(lambda g: dict(zip(g["dow"].astype(int), g["avg_impact"].round(3))), include_groups=False)
             .to_dict()
         )
         cluster_stats["dow_profile"] = cluster_stats["cluster_id"].map(dow_dict).apply(
