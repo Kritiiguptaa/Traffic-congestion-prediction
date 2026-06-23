@@ -40,6 +40,8 @@ function showDashHub(){
   if(dashHub) dashHub.style.display = 'block';
   Object.values(dashSections).forEach(s => { if(s) s.style.display = 'none'; });
   if(dashboardView) dashboardView.scrollTop = 0;
+  // banner is measurable now that the hub is visible — align its notch
+  if(typeof positionHeadlineNotch === 'function') positionHeadlineNotch();
 }
 
 function showDashSection(name){
@@ -122,7 +124,13 @@ function renderDashboardDefault(){
 
   const totalViolations = allClusters.reduce((sum, a) => sum + a.violations, 0);
   const stationCount = new Set(allClusters.map(c => c.police_station).filter(Boolean)).size;
+  // headline counts both red (high) and yellow (medium) tiers as "elevated-risk"
+  // zones needing attention; the stat card below still shows high-only.
   const highRiskCount = allClusters.filter(a => riskLabel(a.predicted_score) === 'high').length;
+  const elevatedRiskCount = allClusters.filter(a => {
+    const r = riskLabel(a.predicted_score);
+    return r === 'high' || r === 'medium';
+  }).length;
 
   document.getElementById('cityStatAreas').textContent = allClusters.length;
   document.getElementById('cityStatViolations').textContent = totalViolations;
@@ -130,7 +138,7 @@ function renderDashboardDefault(){
   document.getElementById('cityStatStations').textContent = stationCount;
 
   // NEW: headline banner — quick "why this matters" framing for judges
-  renderDashHeadline(allClusters, totalViolations, highRiskCount);
+  renderDashHeadline(allClusters, totalViolations, elevatedRiskCount);
   // NEW: quadrant visual (frequency x severity)
   renderQuadrantGrid(allClusters);
   // NEW: traffic-flow impact — ranked chokepoints + explainability feature card
@@ -363,7 +371,7 @@ function renderStationDashboard(station){
 // ==========================================================================
 
 // ---- NEW: headline stat banner ----
-function renderDashHeadline(clusters, totalViolations, highRiskCount){
+function renderDashHeadline(clusters, totalViolations, elevatedRiskCount){
   const el = document.getElementById('dashHeadline');
   if(!el) return;
 
@@ -375,8 +383,8 @@ function renderDashHeadline(clusters, totalViolations, highRiskCount){
 
   el.innerHTML = `
     <div class="dash-headline-item">
-      <span class="dash-headline-value">${highRiskCount} high-risk zones</span>
-      <span class="dash-headline-label">out of ${clusters.length} tracked areas</span>
+      <span class="dash-headline-value">${elevatedRiskCount} elevated-risk zones</span>
+      <span class="dash-headline-label">high + medium risk, of ${clusters.length} tracked areas</span>
     </div>
     <div class="dash-headline-item">
       <span class="dash-headline-value">${concentrationPct}% of violations</span>
@@ -387,7 +395,26 @@ function renderDashHeadline(clusters, totalViolations, highRiskCount){
       <span class="dash-headline-label">worth proactive patrol attention</span>
     </div>
   `;
+  // align the banner notch under whichever time chip is active
+  positionHeadlineNotch();
 }
+
+// ---- NEW: point the headline banner's notch at the active time chip ----
+function positionHeadlineNotch(){
+  const banner = document.getElementById('dashHeadline');
+  const chips = document.getElementById('dashTimeFilters');
+  if(!banner || !chips) return;
+  const active = chips.querySelector('.dash-time-chip.active');
+  if(!active) return;
+  // x of the active chip's centre, relative to the banner's left edge
+  const chipRect = active.getBoundingClientRect();
+  const bannerRect = banner.getBoundingClientRect();
+  const x = (chipRect.left + chipRect.width / 2) - bannerRect.left;
+  // clamp so the notch stays within the banner's rounded corners
+  const clamped = Math.max(20, Math.min(bannerRect.width - 20, x));
+  banner.style.setProperty('--notch-x', clamped + 'px');
+}
+window.addEventListener('resize', positionHeadlineNotch);
 
 // ---- NEW: time filter chips — quick presets that set timeInput + reload ----
 const dashTimeFiltersEl = document.getElementById('dashTimeFilters');
@@ -397,6 +424,7 @@ if(dashTimeFiltersEl){
     if(!btn) return;
     [...dashTimeFiltersEl.querySelectorAll('.dash-time-chip')].forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
+    positionHeadlineNotch();
 
     const preset = btn.dataset.when;
     const now = new Date();
