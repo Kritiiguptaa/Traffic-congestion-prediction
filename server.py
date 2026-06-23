@@ -11,6 +11,7 @@ Endpoints:
 """
 import os
 import math
+import pickle
 import time
 import pandas as pd
 from datetime import datetime
@@ -29,6 +30,11 @@ DATA_FILE = os.environ.get(
     "VIOLATIONS_FILE",
     "jan to may police violation_anonymized791b166_without_null_only_columns.xlsx"
 )
+# Pickled (scored_df, cluster_stats, predictor) — built once at Docker image
+# build time so containers boot in ~1-2s instead of re-running the full
+# Excel-parse + scoring + DBSCAN + GradientBoosting pipeline (~1-2 min) on
+# every restart. Falls back to a live pipeline run if missing/stale.
+PIPELINE_CACHE_FILE = os.environ.get("PIPELINE_CACHE_FILE", "pipeline_cache.pkl")
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -50,8 +56,31 @@ state = {"scored": None, "stats": None, "predictor": None, "last_loaded": None}
 
 
 def load_state():
-    scored, stats = run_pipeline(DATA_FILE)
-    predictor = HotspotPredictor(scored, stats)
+    cache_fresh = (
+        os.path.exists(PIPELINE_CACHE_FILE)
+        and os.path.exists(DATA_FILE)
+        and os.path.getmtime(PIPELINE_CACHE_FILE) >= os.path.getmtime(DATA_FILE)
+    )
+    if cache_fresh:
+        try:
+            t0 = time.time()
+            with open(PIPELINE_CACHE_FILE, "rb") as f:
+                scored, stats, predictor = pickle.load(f)
+            print(f"[server] Loaded pipeline cache in {time.time() - t0:.2f}s "
+                  f"({len(scored)} rows, {len(stats)} clusters)", flush=True)
+        except Exception as e:
+            print(f"[server] Cache load failed ({e}), running pipeline live", flush=True)
+            cache_fresh = False
+
+    if not cache_fresh:
+        scored, stats = run_pipeline(DATA_FILE)
+        predictor = HotspotPredictor(scored, stats)
+        try:
+            with open(PIPELINE_CACHE_FILE, "wb") as f:
+                pickle.dump((scored, stats, predictor), f)
+        except Exception as e:
+            print(f"[server] Could not write pipeline cache: {e}", flush=True)
+
     state["scored"] = scored
     state["stats"] = stats
     state["predictor"] = predictor
