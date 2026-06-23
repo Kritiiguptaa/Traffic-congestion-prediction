@@ -13,7 +13,3 @@ server_err.log
 *.xlsx
 *.xls
 hotspots.csv
-
-# pipeline cache is generated fresh inside the image during build, never
-# copied in from the host (a stale local cache must never ship in the image)
-pipeline_cache.pkl
