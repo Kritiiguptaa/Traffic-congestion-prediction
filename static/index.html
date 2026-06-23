@@ -176,7 +176,7 @@
   /* ---- dashboard view (search a police station, see its results) ---- */
   #dashboardView{
     position:absolute;top:56px;left:0;right:0;bottom:0;
-    background:var(--canvas);overflow-y:auto;display:none;
+    background:var(--canvas);overflow-y:auto;overflow-x:hidden;display:none;
   }
   .dashboard-wrap{max-width:1080px;margin:0 auto;padding:30px 28px 70px;}
   .dashboard-title{font-size:21px;font-weight:700;margin-bottom:20px;letter-spacing:-0.01em;color:var(--ink);}
@@ -203,6 +203,7 @@
 
   /* default (no station selected) view: top areas + risk breakdown side by side */
   .dash-default-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .dash-default-grid > *{min-width:0;}
   @media (max-width: 820px){ .dash-default-grid{grid-template-columns:1fr;} }
 
   .dash-risk-row{padding:11px 0;}
@@ -226,11 +227,11 @@
   .dash-panel-title{font-size:13.5px;color:var(--muted);font-weight:500;}
   .dash-panel-title b{color:var(--ink);}
 
-  .dash-bar-row{padding:13px 0;border-bottom:1px solid var(--line-soft);}
+  .dash-bar-row{padding:13px 0;border-bottom:1px solid var(--line-soft);min-width:0;}
   .dash-bar-row:last-child{border-bottom:none;}
   .dash-bar-row-clickable{cursor:pointer;border-radius:8px;}
   .dash-bar-row-clickable:hover{background:var(--canvas);}
-  .dash-bar-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+  .dash-bar-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;min-width:0;}
   .dash-bar-label{font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
   .dash-bar-track{height:6px;background:var(--line-soft);border-radius:999px;overflow:hidden;margin-bottom:7px;}
   .dash-bar-fill{height:100%;background:var(--bar);border-radius:999px;}
@@ -366,23 +367,23 @@
     padding:7px 14px;cursor:pointer;
   }
   .plan-day-btn.active{background:var(--accent);color:#fff;}
-  .patrol-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
-  @media (max-width: 880px){ .patrol-grid{grid-template-columns:repeat(2,1fr);} }
-  @media (max-width: 520px){ .patrol-grid{grid-template-columns:1fr;} }
+  .patrol-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;}
+  @media (max-width: 880px){ .patrol-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  @media (max-width: 520px){ .patrol-grid{grid-template-columns:minmax(0,1fr);} }
   .patrol-shift{
     border:1px solid var(--line);border-radius:11px;background:var(--canvas);
-    padding:14px;display:flex;flex-direction:column;gap:10px;
+    padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;
   }
   .patrol-shift-head{display:flex;align-items:baseline;justify-content:space-between;}
   .patrol-shift-name{font-size:13px;font-weight:700;color:var(--ink);}
   .patrol-shift-time{font-size:12px;color:var(--muted);font-weight:600;}
   .patrol-zone{
     background:var(--paper);border:1px solid var(--line-soft);border-radius:8px;
-    padding:9px 10px;cursor:pointer;transition:border-color 0.15s;
+    padding:9px 10px;cursor:pointer;transition:border-color 0.15s;min-width:0;
   }
   .patrol-zone:hover{border-color:var(--accent);}
-  .patrol-zone-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;}
-  .patrol-zone-name{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .patrol-zone-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;min-width:0;}
+  .patrol-zone-name{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;}
   .patrol-zone-meta{font-size:11px;color:var(--muted);line-height:1.4;}
   .patrol-rank{
     flex:none;width:18px;height:18px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
