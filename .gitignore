@@ -25,5 +25,8 @@ Thumbs.db
 
 # IDE
 .vscode/
-.idea/server_run.log
+.idea/
+
+# Dev server logs
+server_run.log
 server_err.log
