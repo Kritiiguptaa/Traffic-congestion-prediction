@@ -11,6 +11,7 @@ Endpoints:
 """
 import os
 import math
+import pandas as pd
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -25,7 +26,7 @@ from temporal_model import HotspotPredictor
 
 DATA_FILE = os.environ.get(
     "VIOLATIONS_FILE",
-    "jan to may police violation_anonymized791b166_without_null_only_columns.csv"
+    "jan to may police violation_anonymized791b166_without_null_only_columns.xlsx"
 )
 
 app = Flask(__name__, static_folder="static", static_url_path="")
@@ -84,6 +85,11 @@ def api_clusters():
             "police_station": clean_str(row.get("police_station")),
             "junction_name": clean_str(row.get("junction_name")),
             "location": clean_str(row.get("location")),
+            "peak_dow_name": clean_str(row.get("peak_dow_name"), None),
+            "peak_hour": None if pd.isna(row.get("peak_hour")) else int(row.get("peak_hour")),
+            "trend_pct": float(row.get("trend_pct", 0.0)),
+            "trend_label": clean_str(row.get("trend_label"), "stable"),
+            "quadrant": clean_str(row.get("quadrant")),
         })
     return jsonify({"clusters": out, "last_loaded": state["last_loaded"]})
 
@@ -161,4 +167,4 @@ def api_status():
 
 if __name__ == "__main__":
     load_state()
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)

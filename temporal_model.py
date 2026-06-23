@@ -249,8 +249,8 @@ class HotspotPredictor:
 
     @staticmethod
     def _risk_label(score: float) -> str:
-        if score >= 0.45:
+        if score >= 0.35:
             return "high"
-        elif score >= 0.25:
+        elif score >= 0.12:
             return "medium"
         return "low"

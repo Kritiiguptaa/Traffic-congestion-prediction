@@ -269,7 +269,89 @@ def build_cluster_stats(df: pd.DataFrame) -> pd.DataFrame:
     else:
         cluster_stats["dow_profile"] = [{}] * len(cluster_stats)
 
+    # ── peak day/hour: busiest dow+hour combo per cluster, by volume ──
+    if "dow" in hotspots.columns and "hour" in hotspots.columns and hotspots["dow"].notna().any():
+        peak = (
+            hotspots.dropna(subset=["dow", "hour"])
+            .groupby(["cluster_id", "dow", "hour"])
+            .size()
+            .reset_index(name="cnt")
+        )
+        if not peak.empty:
+            top_idx = peak.groupby("cluster_id")["cnt"].idxmax()
+            peak_rows = peak.loc[top_idx].set_index("cluster_id")
+            cluster_stats["peak_dow_name"] = cluster_stats["cluster_id"].map(
+                peak_rows["dow"].astype(int).map(DOW_NAMES)
+            )
+            cluster_stats["peak_hour"] = cluster_stats["cluster_id"].map(
+                peak_rows["hour"].astype(int)
+            )
+    if "peak_dow_name" not in cluster_stats.columns:
+        cluster_stats["peak_dow_name"] = None
+        cluster_stats["peak_hour"] = None
+
+    # ── trend: is violation volume rising or falling within the data window? ──
+    cluster_stats["trend_pct"] = 0.0
+    cluster_stats["trend_label"] = "stable"
+    if "event_time" in hotspots.columns:
+        trend_map = (
+            hotspots.groupby("cluster_id")
+            .apply(_cluster_trend, include_groups=False)
+            .to_dict()
+        )
+        cluster_stats["trend_pct"] = cluster_stats["cluster_id"].map(
+            lambda cid: trend_map.get(cid, (0.0, "stable"))[0]
+        )
+        cluster_stats["trend_label"] = cluster_stats["cluster_id"].map(
+            lambda cid: trend_map.get(cid, (0.0, "stable"))[1]
+        )
+
+    # ── quadrant: frequency (violation volume) x severity (avg impact), split on the
+    # median across all clusters -- tells police whether an area needs steady patrolling
+    # (frequent) vs a one-off severe-incident watch (rare & severe), etc. ──
+    med_violations = cluster_stats["violations"].median()
+    med_impact = cluster_stats["avg_impact"].median()
+    cluster_stats["quadrant"] = cluster_stats.apply(
+        lambda r: ("Frequent" if r["violations"] >= med_violations else "Rare")
+        + " & "
+        + ("Severe" if r["avg_impact"] >= med_impact else "Mild"),
+        axis=1,
+    )
+
     return cluster_stats
+
+
+def _cluster_trend(g: pd.DataFrame, min_rows: int = 10):
+    """Compare violation rate (per day) in the first vs second half of a cluster's
+    history. Returns (trend_pct, trend_label) where label is rising/falling/stable
+    using a +-15% threshold."""
+    g = g.dropna(subset=["event_time"]).sort_values("event_time")
+    if len(g) < min_rows:
+        return 0.0, "stable"
+
+    median_time = g["event_time"].median()
+    first = g[g["event_time"] <= median_time]
+    second = g[g["event_time"] > median_time]
+    if first.empty or second.empty:
+        return 0.0, "stable"
+
+    span_first = max((first["event_time"].max() - first["event_time"].min()).days, 1)
+    span_second = max((second["event_time"].max() - second["event_time"].min()).days, 1)
+    rate_first = len(first) / span_first
+    rate_second = len(second) / span_second
+
+    if rate_first == 0:
+        pct = 100.0 if rate_second > 0 else 0.0
+    else:
+        pct = (rate_second - rate_first) / rate_first * 100
+
+    if pct >= 15:
+        label = "rising"
+    elif pct <= -15:
+        label = "falling"
+    else:
+        label = "stable"
+    return round(pct, 1), label
 
 
 # ─────────────────────────────────────────────
@@ -285,7 +367,7 @@ def run_pipeline(filepath: str, eps_m: float = 200, min_samples: int = 20):
 
 if __name__ == "__main__":
     scored, stats = run_pipeline(
-        "jan to may police violation_anonymized791b166_without_null_only_columns.csv"
+        "jan to may police violation_anonymized791b166_without_null_only_columns.xlsx"
     )
     print(f"Rows scored : {len(scored)}")
     print(f"Clusters    : {len(stats)}")

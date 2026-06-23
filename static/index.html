@@ -1,327 +1,3 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bengaluru Parking Hotspots</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  :root{
-    --ink:#1a1a1a;
-    --paper:#ffffff;
-    --line:#e3e3e3;
-    --muted:#6b6b6b;
-    --high:#d6463a;
-    --medium:#e0a02e;
-    --low:#3b8f5c;
-    --accent:#1f6feb;
-    --shadow: 0 1px 2px rgba(0,0,0,0.08), 0 4px 14px rgba(0,0,0,0.12);
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);}
-  #map{position:absolute;inset:0;z-index:0;}
-
-  /* ---- floating search bar ---- */
-  .search-wrap{
-    position:absolute;
-    top:14px; left:14px;
-    z-index:1000;
-    width:380px;
-    max-width:calc(100vw - 28px);
-  }
-  .search-card{
-    background:var(--paper);
-    border-radius:10px;
-    box-shadow:var(--shadow);
-    padding:4px;
-  }
-  .search-row{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:10px 12px;
-  }
-  .search-row svg{flex:none;color:var(--muted);}
-  .search-row input{
-    border:none;outline:none;flex:1;
-    font-size:14.5px;color:var(--ink);background:transparent;
-  }
-  .search-row input::placeholder{color:#9a9a9a;}
-  .divider{height:1px;background:var(--line);margin:0 8px;}
-  .time-row{
-    display:flex;align-items:center;gap:10px;
-    padding:9px 12px;
-  }
-  .time-row svg{flex:none;color:var(--muted);}
-  .time-row input[type="datetime-local"]{
-    border:none;outline:none;flex:1;font-size:13.5px;color:var(--ink);background:transparent;font-family:inherit;
-  }
-  .now-btn{
-    border:1px solid var(--line);background:#fff;border-radius:6px;
-    font-size:12px;padding:4px 9px;color:var(--accent);cursor:pointer;white-space:nowrap;
-  }
-  .now-btn:hover{background:#f2f6ff;}
-
-  .suggestions{
-    margin-top:6px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
-    overflow:hidden;max-height:260px;overflow-y:auto;
-  }
-  .suggestion-item{
-    padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line);
-    display:flex;flex-direction:column;gap:2px;
-  }
-  .suggestion-item:last-child{border-bottom:none;}
-  .suggestion-item:hover{background:#f5f7fa;}
-  .suggestion-title{font-size:13.5px;font-weight:600;}
-  .suggestion-sub{font-size:12px;color:var(--muted);}
-
-  /* ---- result / prediction card ---- */
-  .result-card{
-    margin-top:8px;background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
-    padding:14px 16px;display:none;
-  }
-  .result-card.visible{display:block;}
-  .result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-  .result-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
-  .risk-pill{
-    font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;color:#fff;text-transform:capitalize;
-  }
-  .risk-high{background:var(--high);}
-  .risk-medium{background:var(--medium);}
-  .risk-low{background:var(--low);}
-  .result-score{font-size:28px;font-weight:700;margin:2px 0 6px;}
-  .result-meta{font-size:12.5px;color:var(--muted);line-height:1.6;}
-  .result-meta b{color:var(--ink);font-weight:600;}
-
-  /* ---- legend ---- */
-  .legend{
-    position:absolute;bottom:18px;left:14px;z-index:1000;
-    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
-    padding:10px 14px;font-size:12.5px;display:flex;gap:14px;align-items:center;
-  }
-  .legend-item{display:flex;align-items:center;gap:6px;color:var(--muted);}
-  .legend-dot{width:9px;height:9px;border-radius:50%;}
-
-  /* ---- status pill (top right) ---- */
-  .status{
-    position:absolute;top:14px;right:14px;z-index:1000;
-    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
-    padding:8px 12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;
-  }
-  .status .dot{width:7px;height:7px;border-radius:50%;background:var(--low);}
-  .refresh-btn{
-    border:none;background:transparent;color:var(--accent);font-size:12px;cursor:pointer;font-weight:600;padding:0;
-  }
-
-  .leaflet-popup-content{font-size:13px;line-height:1.5;}
-  .popup-title{font-weight:700;margin-bottom:3px;}
-  .popup-score{color:var(--high);font-weight:700;}
-</style>
-</head>
-<body>
-
-<div id="map"></div>
-
-<div class="search-wrap">
-  <div class="search-card">
-    <div class="search-row">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="searchInput" type="text" placeholder="Search a location in Bengaluru" autocomplete="off" />
-    </div>
-    <div class="divider"></div>
-    <div class="time-row">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14.5"/></svg>
-      <input id="timeInput" type="datetime-local" />
-      <button class="now-btn" id="nowBtn">Now</button>
-    </div>
-  </div>
-
-  <div class="suggestions" id="suggestions" style="display:none;"></div>
-
-  <div class="result-card" id="resultCard">
-    <div class="result-header">
-      <span class="result-title" id="resultLocationName">Selected location</span>
-      <span class="risk-pill" id="riskPill">—</span>
-    </div>
-    <div class="result-score" id="resultScore">—</div>
-    <div class="result-meta" id="resultMeta"></div>
-  </div>
-</div>
-
-<div class="legend">
-  <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High risk</div>
-  <div class="legend-item"><span class="legend-dot" style="background:var(--medium)"></span>Medium</div>
-  <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low</div>
-</div>
-
-<div class="status">
-  <span class="dot"></span>
-  <span id="statusText">Loading…</span>
-  <button class="refresh-btn" id="refreshBtn">Refresh</button>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const API = ""; // same origin
-
-const map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
-L.control.zoom({ position: 'bottomright' }).addTo(map);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 19
-}).addTo(map);
-
-let clusterMarkers = [];
-let queryMarker = null;
-
-function riskColor(score){
-  if(score >= 0.45) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
-  if(score >= 0.25) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
-  return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
-}
-function riskLabel(score){
-  if(score >= 0.45) return 'high';
-  if(score >= 0.25) return 'medium';
-  return 'low';
-}
-
-async function loadClusters(){
-  const res = await fetch(`${API}/api/clusters`);
-  const data = await res.json();
-  clusterMarkers.forEach(m => map.removeLayer(m));
-  clusterMarkers = [];
-
-  data.clusters.forEach(c => {
-    const color = riskColor(c.avg_impact);
-    const radius = Math.min(22, 6 + Math.sqrt(c.violations));
-    const marker = L.circleMarker([c.latitude, c.longitude], {
-      radius, color, fillColor: color, fillOpacity: 0.55, weight: 1.5
-    }).addTo(map);
-
-    marker.bindPopup(`
-      <div class="popup-title">${c.location || c.police_station}</div>
-      <div>Police station: <b>${c.police_station}</b></div>
-      <div>Junction: <b>${c.junction_name || '—'}</b></div>
-      <div>Violations recorded: <b>${c.violations}</b></div>
-      <div>Avg severity: <span class="popup-score">${c.avg_impact}</span></div>
-    `);
-    clusterMarkers.push(marker);
-  });
-
-  document.getElementById('statusText').textContent =
-    `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
-}
-
-async function refreshData(){
-  document.getElementById('statusText').textContent = 'Refreshing…';
-  await fetch(`${API}/api/refresh`, { method: 'POST' });
-  await loadClusters();
-}
-
-document.getElementById('refreshBtn').addEventListener('click', refreshData);
-
-// ---- time input default ----
-const timeInput = document.getElementById('timeInput');
-function setNow(){
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  timeInput.value = now.toISOString().slice(0,16);
-}
-setNow();
-document.getElementById('nowBtn').addEventListener('click', setNow);
-
-// ---- search / geocode ----
-const searchInput = document.getElementById('searchInput');
-const suggestionsEl = document.getElementById('suggestions');
-let searchDebounce = null;
-let selectedLocation = null; // {lat, lng, label}
-
-searchInput.addEventListener('input', () => {
-  clearTimeout(searchDebounce);
-  const q = searchInput.value.trim();
-  if(q.length < 2){ suggestionsEl.style.display = 'none'; return; }
-  searchDebounce = setTimeout(async () => {
-    const res = await fetch(`${API}/api/geocode?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    renderSuggestions(data.results);
-  }, 200);
-});
-
-function renderSuggestions(results){
-  if(!results.length){ suggestionsEl.style.display = 'none'; return; }
-  suggestionsEl.innerHTML = results.map((r,i) => `
-    <div class="suggestion-item" data-idx="${i}">
-      <div class="suggestion-title">${r.label}</div>
-      <div class="suggestion-sub">${r.police_station}${r.junction_name && r.junction_name !== 'No Junction' ? ' · ' + r.junction_name : ''}</div>
-    </div>
-  `).join('');
-  suggestionsEl.style.display = 'block';
-  [...suggestionsEl.querySelectorAll('.suggestion-item')].forEach((el, i) => {
-    el.addEventListener('click', () => {
-      const r = results[i];
-      selectedLocation = { lat: r.latitude, lng: r.longitude, label: r.label };
-      searchInput.value = r.label;
-      suggestionsEl.style.display = 'none';
-      map.flyTo([r.latitude, r.longitude], 15, { duration: 0.6 });
-      runPrediction();
-    });
-  });
-}
-
-document.addEventListener('click', (e) => {
-  if(!e.target.closest('.search-wrap')) suggestionsEl.style.display = 'none';
-});
-
-// click anywhere on the map to query that point
-map.on('click', (e) => {
-  selectedLocation = { lat: e.latlng.lat, lng: e.latlng.lng, label: `${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}` };
-  searchInput.value = selectedLocation.label;
-  runPrediction();
-});
-
-timeInput.addEventListener('change', () => { if(selectedLocation) runPrediction(); });
-
-async function runPrediction(){
-  if(!selectedLocation) return;
-  const when = timeInput.value; // already local ISO-ish
-  const url = `${API}/api/predict?lat=${selectedLocation.lat}&lng=${selectedLocation.lng}&when=${encodeURIComponent(when)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  showResult(selectedLocation.label, data);
-
-  if(queryMarker) map.removeLayer(queryMarker);
-  queryMarker = L.marker([selectedLocation.lat, selectedLocation.lng]).addTo(map);
-}
-
-function showResult(label, data){
-  const card = document.getElementById('resultCard');
-  card.classList.add('visible');
-  document.getElementById('resultLocationName').textContent = label;
-
-  const pill = document.getElementById('riskPill');
-  pill.textContent = data.risk_level;
-  pill.className = `risk-pill risk-${data.risk_level}`;
-
-  document.getElementById('resultScore').textContent = data.predicted_score;
-
-  let meta = `Severity profile: <b>${data.severity_score}</b> (${data.severity_source.replace('_',' ')})<br>`;
-  meta += `Activity likelihood: <b>${data.activity_factor}</b> (${data.activity_source.replace('_',' ')})<br>`;
-  if(data.nearest_cluster_id !== null && data.nearest_cluster_id !== undefined){
-    meta += `Nearest known hotspot: <b>${Math.round(data.nearest_cluster_distance_m)}m</b> away`;
-    if(data.historical_sample_size > 0) meta += ` · ${data.historical_sample_size} past records at this time slot`;
-  } else {
-    meta += `No known hotspot nearby — estimate from city-wide model`;
-  }
-  document.getElementById('resultMeta').innerHTML = meta;
-}
-
-// initial load
-loadClusters();
-</script>
-</body>
-</html> -->
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -339,10 +15,28 @@ loadClusters();
     --medium:#e0a02e;
     --low:#3b8f5c;
     --accent:#1f6feb;
+    --bar:#6366f1;
     --shadow: 0 1px 2px rgba(0,0,0,0.08), 0 4px 14px rgba(0,0,0,0.12);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);}
+
+  /* ---- top navigation bar ---- */
+  .navbar{
+    position:absolute;top:0;left:0;right:0;height:50px;z-index:2000;
+    background:var(--paper);box-shadow:var(--shadow);
+    display:flex;align-items:center;gap:6px;padding:0 16px;
+  }
+  .navbar .brand{font-weight:700;font-size:14.5px;margin-right:18px;color:var(--ink);}
+  .nav-btn{
+    border:none;background:transparent;font-size:14px;font-weight:600;color:var(--muted);
+    padding:9px 18px;border-radius:8px;cursor:pointer;
+  }
+  .nav-btn:hover{background:#f2f6ff;}
+  .nav-btn.active{background:var(--accent);color:#fff;}
+  .nav-btn.active:hover{background:var(--accent);}
+
+  #mapView{position:absolute;top:50px;left:0;right:0;bottom:0;}
   #map{position:absolute;inset:0;z-index:0;}
 
   /* ---- floating search bar ---- */
@@ -409,6 +103,7 @@ loadClusters();
   .result-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
   .risk-pill{
     font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;color:#fff;text-transform:capitalize;
+    display:inline-block;
   }
   .risk-high{background:var(--high);}
   .risk-medium{background:var(--medium);}
@@ -459,59 +154,235 @@ loadClusters();
     opacity:0.55;
     pointer-events:none;
   }
+
+  /* ---- dashboard view (search a police station, see its results) ---- */
+  #dashboardView{
+    position:absolute;top:50px;left:0;right:0;bottom:0;
+    background:#f3f4f6;overflow-y:auto;display:none;
+  }
+  .dashboard-wrap{max-width:1040px;margin:0 auto;padding:22px 24px 60px;}
+  .dashboard-title{font-size:19px;font-weight:700;margin-bottom:16px;}
+
+  /* toolbar: searchable station dropdown */
+  .dash-toolbar{margin-bottom:20px;}
+  .dash-station-search-wrap{position:relative;width:340px;}
+  .dash-station-search-wrap svg{
+    position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;
+  }
+  #dashStationSearch{
+    width:100%;border:1px solid var(--line);background:var(--paper);border-radius:8px;
+    font-size:14px;padding:10px 14px 10px 38px;outline:none;font-family:inherit;box-shadow:var(--shadow);
+  }
+  #dashStationSearch:focus{border-color:var(--accent);}
+  .dash-suggestions{
+    position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:10;
+    background:var(--paper);border-radius:10px;box-shadow:var(--shadow);
+    overflow:hidden;max-height:280px;overflow-y:auto;
+  }
+  .dash-suggestions .suggestion-item{padding:9px 14px;font-size:13.5px;}
+
+  .dashboard-hint{font-size:12.5px;color:var(--muted);text-align:center;margin-top:16px;}
+
+  /* default (no station selected) view: top areas + risk breakdown side by side */
+  .dash-default-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width: 820px){ .dash-default-grid{grid-template-columns:1fr;} }
+
+  .dash-risk-row{padding:10px 0;}
+  .dash-risk-row-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:13px;}
+  .dash-risk-label{font-weight:600;}
+  .dash-risk-count{color:var(--muted);}
+
+  /* stat tiles row */
+  .dash-stats-row{display:grid;grid-template-columns:repeat(4, 1fr);gap:14px;margin-bottom:18px;}
+  .dash-stat-card{
+    background:var(--paper);border-radius:12px;box-shadow:var(--shadow);padding:16px 18px;
+  }
+  .dash-stat-label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .dash-stat-value{font-size:26px;font-weight:700;}
+
+  /* main panel: ranked bar list */
+  .dash-panel{
+    background:var(--paper);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;
+  }
+  .dash-panel-header{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--line);}
+  .dash-panel-title{font-size:14.5px;color:var(--muted);}
+  .dash-panel-title b{color:var(--ink);}
+
+  .dash-bar-row{padding:12px 0;border-bottom:1px solid #f0f0f0;}
+  .dash-bar-row:last-child{border-bottom:none;}
+  .dash-bar-row-clickable{cursor:pointer;border-radius:6px;}
+  .dash-bar-row-clickable:hover{background:#fafbfd;}
+  .dash-bar-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;}
+  .dash-bar-label{font-size:13.5px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dash-bar-track{height:7px;background:#eef0f4;border-radius:999px;overflow:hidden;margin-bottom:6px;}
+  .dash-bar-fill{height:100%;background:var(--bar);border-radius:999px;}
+  .dash-bar-meta{font-size:12px;color:var(--muted);line-height:1.6;}
+  .dash-bar-meta b{color:var(--ink);}
+  .dash-view-link{color:var(--accent);text-decoration:none;font-weight:600;}
+  .dash-view-link:hover{text-decoration:underline;}
+  .trend-rising{color:var(--high);font-weight:700;}
+  .trend-falling{color:var(--low);font-weight:700;}
+  .trend-stable{color:var(--muted);font-weight:700;}
 </style>
 </head>
 <body>
 
-<div id="map"></div>
+<div class="navbar">
+  <span class="brand">Bengaluru Parking Hotspots</span>
+  <button class="nav-btn active" id="navMapBtn">Map</button>
+  <button class="nav-btn" id="navDashboardBtn">Dashboard</button>
+</div>
 
-<div class="search-wrap">
-  <div class="search-card">
-    <div class="search-row">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="searchInput" type="text" placeholder="Search a location in Bengaluru" autocomplete="off" />
+<div id="mapView">
+  <div id="map"></div>
+
+  <div class="search-wrap">
+    <div class="search-card">
+      <div class="search-row">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" type="text" placeholder="Search a location in Bengaluru" autocomplete="off" />
+      </div>
+      <div class="divider"></div>
+      <div class="time-row">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14.5"/></svg>
+        <input id="timeInput" type="datetime-local" />
+        <button class="now-btn" id="nowBtn">Now</button>
+      </div>
     </div>
-    <div class="divider"></div>
-    <div class="time-row">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14.5"/></svg>
-      <input id="timeInput" type="datetime-local" />
-      <button class="now-btn" id="nowBtn">Now</button>
+
+    <div class="suggestions" id="suggestions" style="display:none;"></div>
+
+    <div class="result-card" id="resultCard">
+      <div class="result-header">
+        <span class="result-title" id="resultLocationName">Selected location</span>
+        <span class="risk-pill" id="riskPill">—</span>
+      </div>
+      <div class="result-score" id="resultScore">—</div>
+      <div class="result-meta" id="resultMeta"></div>
     </div>
   </div>
 
-  <div class="suggestions" id="suggestions" style="display:none;"></div>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High risk</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--medium)"></span>Medium</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low</div>
+  </div>
 
-  <div class="result-card" id="resultCard">
-    <div class="result-header">
-      <span class="result-title" id="resultLocationName">Selected location</span>
-      <span class="risk-pill" id="riskPill">—</span>
-    </div>
-    <div class="result-score" id="resultScore">—</div>
-    <div class="result-meta" id="resultMeta"></div>
+  <div class="layer-panel">
+    <div class="layer-title">Layers</div>
+    <label class="layer-toggle">
+      <input type="checkbox" id="heatToggle" checked />
+      Heatmap
+    </label>
+    <label class="layer-toggle">
+      <input type="checkbox" id="markersToggle" checked />
+      Markers
+    </label>
+  </div>
+  <div class="status">
+    <span class="dot"></span>
+    <span id="statusText">Loading…</span>
+    <button class="refresh-btn" id="refreshBtn">Refresh</button>
   </div>
 </div>
 
-<div class="legend">
-  <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High risk</div>
-  <div class="legend-item"><span class="legend-dot" style="background:var(--medium)"></span>Medium</div>
-  <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low</div>
-</div>
+<div id="dashboardView">
+  <div class="dashboard-wrap">
+    <div class="dashboard-title">Police Station Priority Dashboard</div>
 
-<div class="layer-panel">
-  <div class="layer-title">Layers</div>
-  <label class="layer-toggle">
-    <input type="checkbox" id="heatToggle" checked />
-    Heatmap
-  </label>
-  <label class="layer-toggle">
-    <input type="checkbox" id="markersToggle" checked />
-    Markers
-  </label>
-</div>
-<div class="status">
-  <span class="dot"></span>
-  <span id="statusText">Loading…</span>
-  <button class="refresh-btn" id="refreshBtn">Refresh</button>
+    <div class="dash-toolbar">
+      <div class="dash-station-search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="dashStationSearch" type="text" placeholder="Search police station…" autocomplete="off" />
+        <div class="dash-suggestions" id="dashStationSuggestions" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div id="dashboardDefault">
+      <div class="dash-stats-row">
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Total areas</div>
+          <div class="dash-stat-value" id="cityStatAreas">—</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Total violations</div>
+          <div class="dash-stat-value" id="cityStatViolations">—</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">High-risk areas</div>
+          <div class="dash-stat-value" id="cityStatHighRisk">—</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Stations covered</div>
+          <div class="dash-stat-value" id="cityStatStations">—</div>
+        </div>
+      </div>
+
+      <div class="dash-default-grid">
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Highest impact right now (citywide)</span>
+          </div>
+          <div id="topAreasList"></div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Most congested areas (by violation count)</span>
+          </div>
+          <div id="topCongestedList"></div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Citywide risk breakdown</span>
+          </div>
+          <div id="riskBreakdownChart"></div>
+        </div>
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Trend overview (rising / falling / stable)</span>
+          </div>
+          <div id="trendOverviewChart"></div>
+        </div>
+      </div>
+
+      <div class="dash-panel" style="margin-top:14px;">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">Busiest police stations (by total violations)</span>
+        </div>
+        <div id="topStationsList"></div>
+      </div>
+
+      <div class="dashboard-hint">Search a police station above to drill into its own priority list.</div>
+    </div>
+
+    <div id="dashboardResults" style="display:none;">
+      <div class="dash-stats-row">
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Areas</div>
+          <div class="dash-stat-value" id="statAreas">—</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Total violations</div>
+          <div class="dash-stat-value" id="statViolations">—</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">High-risk areas</div>
+          <div class="dash-stat-value" id="statHighRisk">—</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-label">Rising-trend areas</div>
+          <div class="dash-stat-value" id="statRising">—</div>
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">Priority areas in <b id="dashStationName"></b></span>
+        </div>
+        <div id="dashAreaList"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -529,24 +400,15 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let clusterMarkers = [];
 let queryMarker = null;
 let heatLayer = null;
+let allClusters = [];
 
 function riskColor(score){
-  // if(score >= 0.45) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
-  // if(score >= 0.25) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
-  // return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
-  // if(score >= 0.4) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
   if(score >= 0.35) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
-  // if(score >= 0.15) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
   if(score >= 0.12) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
   return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
 }
 function riskLabel(score){
-  // if(score >= 0.45) return 'high';
-  // if(score >= 0.25) return 'medium';
-  // return 'low';
-  // if(score >= 0.4) return 'high';
   if(score >= 0.35) return 'high';
-  // if(score >= 0.15) return 'medium';
   if(score >= 0.12) return 'medium';
   return 'low';
 }
@@ -555,18 +417,15 @@ async function loadClusters(){
   const whenParam = timeInput && timeInput.value ? `?when=${encodeURIComponent(timeInput.value)}` : '';
   const res = await fetch(`${API}/api/clusters${whenParam}`);
   const data = await res.json();
+  allClusters = data.clusters;
   clusterMarkers.forEach(m => map.removeLayer(m));
   clusterMarkers = [];
 
   if(heatLayer){ map.removeLayer(heatLayer); heatLayer = null; }
 
-  // const maxScore = Math.max(...data.clusters.map(c => c.cluster_score), 0.001);
-  const maxScore = Math.max(...data.clusters.map(c => c.predicted_score), 0.001);
-  // const heatPoints = [];
   heatLayer = L.layerGroup();  // per-cluster glow circles, colored like markers, no additive saturation
 
   data.clusters.forEach(c => {
-    // const color = riskColor(c.avg_impact);
     const color = riskColor(c.predicted_score);
     const radius = Math.min(22, 6 + Math.sqrt(c.violations));
     const marker = L.circleMarker([c.latitude, c.longitude], {
@@ -588,15 +447,7 @@ async function loadClusters(){
     });
     clusterMarkers.push(marker);
 
-    // normalize cluster_score to 0-1 for heat intensity, weighted toward severity not just volume
-    // const intensity = Math.max(0.4, c.cluster_score / maxScore);
-    // const intensity = Math.max(0.4, c.predicted_score / maxScore);
-    // const intensity = Math.max(0.05, Math.min(1, c.predicted_score));
-    // OLD additive L.heatLayer approach (saturated to red on overlap):
-    // const intensity = c.predicted_score >= 0.4 ? 1.0 : (c.predicted_score >= 0.15 ? 0.55 : 0.18);
-    // heatPoints.push([c.latitude, c.longitude, intensity]);
-
-    // NEW: one soft glow disc per cluster, colored by the SAME riskColor() the markers use.
+    // one soft glow disc per cluster, colored by the SAME riskColor() the markers use.
     // Size scales a little with violations; color updates with time exactly like the markers.
     const glowPx = 38 + Math.min(34, Math.sqrt(c.violations));
     const glowIcon = L.divIcon({
@@ -608,49 +459,15 @@ async function loadClusters(){
     L.marker([c.latitude, c.longitude], { icon: glowIcon, interactive: false }).addTo(heatLayer);
   });
 
-    // if(typeof L.heatLayer !== 'function'){
-    // console.error('L.heatLayer is not available — the leaflet.heat plugin failed to load. Heatmap will be skipped; markers still work.');
-    // document.getElementById('heatToggle').disabled = true;
-    // document.getElementById('heatToggle').checked = false;
-    // document.getElementById('statusText').textContent =
-    // `${data.clusters.length} hotspots (heatmap plugin failed to load — markers only) · ${new Date(data.last_loaded).toLocaleTimeString()}`;
-    // } else {
-    // heatLayer = L.heatLayer(heatPoints, {
-    // // radius: 18, blur: 14, maxZoom: 17, minOpacity: 0.55,
-    // // gradient: { 0.0: '#3b8f5c', 0.35: '#d29922', 0.6: '#d6463a', 0.85: '#a8281f', 1.0: '#7a1410' }
-    // // radius: 20, blur: 16, maxZoom: 17, minOpacity: 0.75,
-    // // gradient: { 0.0: '#2d6b46', 0.3: '#b8821a', 0.55: '#b8362c', 0.8: '#7a1410', 1.0: '#4a0a08' }
-    // // radius: 22, blur: 18, maxZoom: 17, minOpacity: 0.45,
-    // // gradient: { 0.0: '#3b8f5c', 0.3: '#7fae3e', 0.5: '#d29922', 0.7: '#d6463a', 1.0: '#921f17' }
-    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55,
-    // // gradient: { 0.0: '#3b8f5c', 0.3: '#7fae3e', 0.5: '#d29922', 0.7: '#d6463a', 1.0: '#921f17' }
-    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55,
-    // // gradient: { 0.0: '#3b8f5c', 0.12: '#7fae3e', 0.25: '#d29922', 0.4: '#d6463a', 0.6: '#921f17' }
-    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55,
-    // // gradient: { 0.0: '#3b8f5c', 0.15: '#7fae3e', 0.28: '#d29922', 0.4: '#d6463a', 0.6: '#921f17' }
-    // // radius: 22, blur: 18, maxZoom: 19, minOpacity: 0.55, max: 1,
-    // // gradient: { 0.0: '#3b8f5c', 0.15: '#7fae3e', 0.28: '#d29922', 0.4: '#d6463a', 0.6: '#921f17' }
-    // // radius: 15, blur: 12, maxZoom: 19, minOpacity: 0.5, max: 0.5,
-    // // gradient: { 0.0: '#3b8f5c', 0.3: '#7fae3e', 0.56: '#d29922', 0.8: '#d6463a', 1.0: '#921f17' }
-    // radius: 22,
-    // blur: 18,
-    // maxZoom: 19,
-    // minOpacity: 0.5,
-    // max: 2,
-    // gradient: { 0.0: '#3b8f5c', 0.17: '#3b8f5c', 0.18: '#d29922', 0.54: '#d29922', 0.55: '#d6463a', 1.0: '#d6463a' }
-    // });
-    // if(document.getElementById('heatToggle').checked) heatLayer.addTo(map);
-    // document.getElementById('statusText').textContent =
-    // `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
-    // }
-  // NEW glow-group render (replaces additive L.heatLayer block above):
   if(document.getElementById('heatToggle').checked) heatLayer.addTo(map);
   document.getElementById('statusText').textContent =
-    `${data.clusters.length} hotspots \u00b7 updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
+    `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
 
   clusterMarkers.forEach(m => {
     if(!document.getElementById('markersToggle').checked) map.removeLayer(m);
   });
+
+  return data.clusters;
 }
 
 document.getElementById('heatToggle').addEventListener('change', (e) => {
@@ -670,6 +487,7 @@ async function refreshData(){
   document.getElementById('statusText').textContent = 'Refreshing…';
   await fetch(`${API}/api/refresh`, { method: 'POST' });
   await loadClusters();
+  refreshDashboardView();
 }
 
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
@@ -682,11 +500,11 @@ function setNow(){
   timeInput.value = now.toISOString().slice(0,16);
 }
 setNow();
-// document.getElementById('nowBtn').addEventListener('click', setNow);
-document.getElementById('nowBtn').addEventListener('click', () => {
+document.getElementById('nowBtn').addEventListener('click', async () => {
   setNow();
-  loadClusters();
+  await loadClusters();
   if(selectedLocation) runPrediction();
+  refreshDashboardView();
 });
 
 // ---- search / geocode ----
@@ -738,10 +556,10 @@ map.on('click', (e) => {
   runPrediction();
 });
 
-// timeInput.addEventListener('change', () => { if(selectedLocation) runPrediction(); });
-timeInput.addEventListener('change', () => {
+timeInput.addEventListener('change', async () => {
   if(selectedLocation) runPrediction();
-  loadClusters();
+  await loadClusters();
+  refreshDashboardView();
 });
 
 async function runPrediction(){
@@ -781,5 +599,6 @@ function showResult(label, data){
 // initial load
 loadClusters();
 </script>
+<script src="dashboard.js"></script>
 </body>
 </html>
