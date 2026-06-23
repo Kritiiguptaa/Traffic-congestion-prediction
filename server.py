@@ -104,6 +104,15 @@ def api_clusters():
             "trend_pct": float(row.get("trend_pct", 0.0)),
             "trend_label": clean_str(row.get("trend_label"), "stable"),
             "quadrant": clean_str(row.get("quadrant")),
+            # ── traffic-flow impact model (quantifies carriageway congestion) ──
+            "tfi_index": 0 if pd.isna(row.get("tfi_index")) else int(row.get("tfi_index", 0)),
+            "obstruction_intensity": float(row.get("obstruction_intensity", 0.0) or 0.0),
+            "pct_lane_capacity_cut": float(row.get("pct_lane_capacity_cut", 0.0) or 0.0),
+            "veh_affected_peak": 0 if pd.isna(row.get("veh_affected_peak")) else int(row.get("veh_affected_peak", 0)),
+            "junction_share": float(row.get("junction_share", 0.0) or 0.0),
+            "mean_footprint": float(row.get("mean_footprint", 1.0) or 1.0),
+            "volume_factor": float(row.get("volume_factor", 0.0) or 0.0),
+            "block_reason": clean_str(row.get("block_reason"), ""),
         })
     return jsonify({"clusters": out, "last_loaded": state["last_loaded"]})
 

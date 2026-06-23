@@ -20,11 +20,41 @@ function showDashboard(){
   dashboardView.style.display = 'block';
   navMapBtn.classList.remove('active');
   navDashboardBtn.classList.add('active');
-  refreshDashboardView();
+  showDashHub();            // always land on the hub
+  refreshDashboardView();   // populate every section's containers
 }
 
 navMapBtn.addEventListener('click', showMap);
 navDashboardBtn.addEventListener('click', showDashboard);
+
+// ---- hub-and-spoke navigation: hub landing <-> focused sections ----
+const dashHub = document.getElementById('dashHub');
+const dashSections = {
+  impact:    document.getElementById('sectionImpact'),
+  patrol:    document.getElementById('sectionPatrol'),
+  analytics: document.getElementById('sectionAnalytics'),
+  stations:  document.getElementById('sectionStations'),
+};
+
+function showDashHub(){
+  if(dashHub) dashHub.style.display = 'block';
+  Object.values(dashSections).forEach(s => { if(s) s.style.display = 'none'; });
+  if(dashboardView) dashboardView.scrollTop = 0;
+}
+
+function showDashSection(name){
+  if(dashHub) dashHub.style.display = 'none';
+  Object.entries(dashSections).forEach(([k, s]) => { if(s) s.style.display = (k === name) ? 'block' : 'none'; });
+  if(dashboardView) dashboardView.scrollTop = 0;
+  if(name === 'patrol') renderPatrolPlan();  // ensure latest plan when opened
+}
+
+[...document.querySelectorAll('.hub-tile')].forEach(tile => {
+  tile.addEventListener('click', () => showDashSection(tile.dataset.section));
+});
+[...document.querySelectorAll('.dash-back')].forEach(btn => {
+  btn.addEventListener('click', showDashHub);
+});
 
 function formatHour(h){
   if(h === null || h === undefined) return '—';
@@ -49,7 +79,7 @@ dashStationSearch.addEventListener('input', () => {
   if(!q){
     dashStationSuggestions.style.display = 'none';
     selectedDashStation = null;
-    showDashboardDefault();
+    showStationsDefault();
     return;
   }
   const stationNames = [...new Set(allClusters.map(c => c.police_station).filter(Boolean))];
@@ -77,14 +107,14 @@ document.addEventListener('click', (e) => {
 
 function refreshDashboardView(){
   if(currentView !== 'dashboard') return;
-  if(selectedDashStation) renderStationDashboard(selectedDashStation);
-  else renderDashboardDefault();
+  renderDashboardDefault();                                  // hub + impact + analytics + patrol + busiest stations
+  if(selectedDashStation) renderStationDashboard(selectedDashStation);  // station drilldown if one is active
 }
 
-function showDashboardDefault(){
-  document.getElementById('dashboardDefault').style.display = 'block';
+// reset the Stations section back to its default (busiest-stations) view
+function showStationsDefault(){
+  document.getElementById('stationsDefault').style.display = 'block';
   document.getElementById('dashboardResults').style.display = 'none';
-  renderDashboardDefault();
 }
 
 function renderDashboardDefault(){
@@ -103,6 +133,17 @@ function renderDashboardDefault(){
   renderDashHeadline(allClusters, totalViolations, highRiskCount);
   // NEW: quadrant visual (frequency x severity)
   renderQuadrantGrid(allClusters);
+  // NEW: traffic-flow impact — ranked chokepoints + explainability feature card
+  renderTopChokepoints();
+  // NEW: predictive patrol deployment plan (scheduled by shift via the temporal model)
+  renderPatrolPlan();
+
+  // hub tile mini-stats
+  const maxTfi = Math.max(0, ...allClusters.map(c => c.tfi_index || 0));
+  const setTile = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  setTile('tileImpactStat', `Worst chokepoint: TFI ${maxTfi}/100`);
+  setTile('tileAnalyticsStat', `${allClusters.length} hotspots analysed`);
+  setTile('tileStationsStat', `${stationCount} stations covered`);
 
   // top priority areas, citywide
   const top = allClusters.slice().sort((a, b) => b.predicted_score - a.predicted_score).slice(0, 5);
@@ -263,9 +304,9 @@ function renderStationDashboard(station){
     .slice()
     .sort((a, b) => b.predicted_score - a.predicted_score);
 
-  document.getElementById('dashboardDefault').style.display = areas.length ? 'none' : 'block';
+  document.getElementById('stationsDefault').style.display = areas.length ? 'none' : 'block';
   document.getElementById('dashboardResults').style.display = areas.length ? 'block' : 'none';
-  if(!areas.length){ renderDashboardDefault(); return; }
+  if(!areas.length){ return; }
 
   document.getElementById('dashStationName').textContent = station;
 
@@ -463,6 +504,264 @@ if(generateReportBtn){
     const a = document.createElement('a');
     a.href = url;
     a.download = `patrol-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
+
+// ==========================================================================
+// NEW: Traffic-flow impact — quantifies how much each hotspot chokes the
+// carriageway, and explains the score (component breakdown + assumptions).
+// ==========================================================================
+
+// ---- ranked list of worst chokepoints by Traffic-Flow Impact ----
+function renderTopChokepoints(){
+  const listEl = document.getElementById('topChokepointsList');
+  if(!listEl) return;
+
+  const ranked = allClusters.slice()
+    .filter(c => c.tfi_index !== undefined)
+    .sort((a, b) => b.tfi_index - a.tfi_index);
+
+  if(!ranked.length){ listEl.innerHTML = '<div class="dash-bar-meta">No impact data available.</div>'; return; }
+
+  const top = ranked.slice(0, 6);
+  listEl.innerHTML = top.map((a, i) => {
+    const pct = Math.max(6, a.tfi_index);
+    return `
+      <div class="dash-bar-row dash-bar-row-clickable" data-cid="${a.cluster_id}">
+        <div class="dash-bar-row-top">
+          <span class="dash-bar-label">${a.location || a.junction_name || a.police_station}</span>
+          <span class="tfi-pill">TFI ${a.tfi_index}</span>
+        </div>
+        <div class="dash-bar-track">
+          <div class="dash-bar-fill" style="width:${pct}%;background:var(--high);"></div>
+        </div>
+        <div class="dash-bar-meta">
+          ~<b>${a.pct_lane_capacity_cut}%</b> lane cut &middot; ~<b>${a.veh_affected_peak}</b> veh/hr delayed at peak &middot;
+          <b>${a.police_station}</b> &middot; mostly ${a.block_reason || '—'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  [...listEl.querySelectorAll('.dash-bar-row')].forEach((el, i) => {
+    el.addEventListener('click', () => renderImpactFeature(top[i]));
+  });
+
+  // default the explainability card to the #1 chokepoint
+  renderImpactFeature(ranked[0]);
+}
+
+// ---- explainability feature card for a single hotspot ----
+function renderImpactFeature(c){
+  if(!c || c.tfi_index === undefined) return;
+
+  document.getElementById('impactName').textContent =
+    c.location || c.junction_name || c.police_station || 'Selected hotspot';
+
+  const junctionPct = Math.round((c.junction_share || 0) * 100);
+  const junctionTxt = junctionPct >= 25
+    ? ` and <b>${junctionPct}%</b> of incidents sit at a junction (where blockage backs up far more traffic)`
+    : '';
+
+  document.getElementById('impactSentence').innerHTML =
+    `Mostly <b>${c.block_reason || 'mixed parking violations'}</b>${junctionTxt}. ` +
+    `This hotspot blocks an estimated <b>${c.pct_lane_capacity_cut}%</b> of one lane's capacity, ` +
+    `delaying roughly <b>${c.veh_affected_peak}</b> vehicles per peak hour ` +
+    `(peak <b>${c.peak_dow_name || '—'} ~${formatHour(c.peak_hour)}</b>).`;
+
+  document.getElementById('impactTfi').textContent = c.tfi_index;
+  document.getElementById('impactLaneCut').textContent = `${c.pct_lane_capacity_cut}%`;
+  document.getElementById('impactVeh').textContent = `~${c.veh_affected_peak}`;
+
+  // component breakdown bars (each 0..1 -> %)
+  const footprintFrac = Math.min(1, (c.mean_footprint || 1) / 2.2);
+  const rows = [
+    { label: 'Obstruction severity', frac: c.obstruction_intensity || 0,
+      val: `${Math.round((c.obstruction_intensity || 0) * 100)}%` },
+    { label: 'At a junction', frac: c.junction_share || 0,
+      val: `${junctionPct}%` },
+    { label: 'Vehicle footprint', frac: footprintFrac,
+      val: `${(c.mean_footprint || 1).toFixed(1)}× car` },
+    { label: 'Volume / persistence', frac: c.volume_factor || 0,
+      val: `${c.violations} incidents` },
+  ];
+
+  document.getElementById('impactBreakdown').innerHTML = rows.map(r => `
+    <div class="impact-bar-row">
+      <div class="impact-bar-top">
+        <span class="impact-bar-label">${r.label}</span>
+        <span class="impact-bar-val">${r.val}</span>
+      </div>
+      <div class="impact-bar-track">
+        <div class="impact-bar-fill" style="width:${Math.max(3, Math.round(r.frac * 100))}%;"></div>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('impactAssumptions').innerHTML =
+    'Estimate assumes ~1,500 veh/hr per lane at peak, with obstruction weighted by ' +
+    'violation type — a double-parked truck at a junction ≈ a full lane block, a helmet ' +
+    'violation ≈ none. TFI index is relative across all tracked hotspots.';
+}
+
+// ==========================================================================
+// NEW: Predictive patrol deployment plan — uses the temporal model to forecast
+// which zones will be worst at each enforcement shift, turning reactive
+// patrolling into a scheduled, proactive roster.
+// ==========================================================================
+
+const PATROL_SHIFTS = [
+  { name: 'Morning peak', hour: 8 },
+  { name: 'Midday',       hour: 13 },
+  { name: 'Evening peak', hour: 18 },
+  { name: 'Night',        hour: 21 },
+];
+const PATROL_TOP_N = 4;
+let patrolPlanDay = 0;            // 0 = today, 1 = tomorrow
+let patrolPlanCache = {};        // keyed by date string
+let lastPatrolPlan = null;       // for the download button
+
+function patrolPlanDateStr(dayOffset){
+  const d = new Date();
+  d.setDate(d.getDate() + dayOffset);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+async function renderPatrolPlan(){
+  const body = document.getElementById('patrolPlanBody');
+  if(!body) return;
+
+  const dateStr = patrolPlanDateStr(patrolPlanDay);
+  if(patrolPlanCache[dateStr]){
+    drawPatrolPlan(patrolPlanCache[dateStr], dateStr);
+    return;
+  }
+
+  body.innerHTML = '<div class="dash-bar-meta">Forecasting hotspots for each shift…</div>';
+
+  try {
+    // query the temporal model in parallel, once per shift hour
+    const results = await Promise.all(PATROL_SHIFTS.map(s => {
+      const when = `${dateStr}T${String(s.hour).padStart(2, '0')}:00`;
+      return fetch(`${API}/api/clusters?when=${encodeURIComponent(when)}`)
+        .then(r => r.json())
+        .then(d => ({ shift: s, clusters: d.clusters || [] }));
+    }));
+
+    const plan = results.map(({ shift, clusters }) => {
+      const ranked = clusters.slice().sort((a, b) => b.predicted_score - a.predicted_score);
+      // spread patrols: prefer distinct police stations, then fill
+      const chosen = [], seen = new Set();
+      for(const c of ranked){
+        if(chosen.length >= PATROL_TOP_N) break;
+        const st = c.police_station || c.cluster_id;
+        if(seen.has(st)) continue;
+        seen.add(st);
+        chosen.push(c);
+      }
+      for(const c of ranked){
+        if(chosen.length >= PATROL_TOP_N) break;
+        if(!chosen.includes(c)) chosen.push(c);
+      }
+      return { shift, zones: chosen };
+    });
+
+    patrolPlanCache[dateStr] = plan;
+    drawPatrolPlan(plan, dateStr);
+  } catch(err){
+    body.innerHTML = '<div class="dash-bar-meta">Could not generate plan (is the server running?).</div>';
+  }
+}
+
+function drawPatrolPlan(plan, dateStr){
+  const body = document.getElementById('patrolPlanBody');
+  lastPatrolPlan = { plan, dateStr };
+
+  body.innerHTML = `<div class="patrol-grid">` + plan.map(({ shift, zones }) => `
+    <div class="patrol-shift">
+      <div class="patrol-shift-head">
+        <span class="patrol-shift-name">${shift.name}</span>
+        <span class="patrol-shift-time">${String(shift.hour).padStart(2, '0')}:00</span>
+      </div>
+      ${zones.map((z, i) => `
+        <div class="patrol-zone" data-lat="${z.latitude}" data-lng="${z.longitude}" data-label="${(z.location || z.police_station || '').replace(/"/g, '')}">
+          <div class="patrol-zone-top">
+            <span class="patrol-zone-name">${z.location || z.junction_name || z.police_station}</span>
+            <span class="risk-pill risk-${riskLabel(z.predicted_score)}">${riskLabel(z.predicted_score)}</span>
+          </div>
+          <div class="patrol-zone-meta">
+            <span class="patrol-rank">${i + 1}</span>
+            ${z.police_station} &middot; impact <b>${z.predicted_score}</b>
+            ${z.tfi_index !== undefined ? `&middot; TFI ${z.tfi_index}` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('') + `</div>`;
+
+  // click a zone -> jump to it on the map
+  [...body.querySelectorAll('.patrol-zone')].forEach(el => {
+    el.addEventListener('click', () => {
+      const lat = parseFloat(el.dataset.lat), lng = parseFloat(el.dataset.lng);
+      selectedLocation = { lat, lng, label: el.dataset.label };
+      searchInput.value = el.dataset.label;
+      showMap();
+      map.flyTo([lat, lng], 16, { duration: 0.6 });
+      runPrediction();
+    });
+  });
+}
+
+function buildPatrolPlanText(){
+  if(!lastPatrolPlan) return '';
+  const { plan, dateStr } = lastPatrolPlan;
+  let lines = [];
+  lines.push('BENGALURU — PREDICTIVE PATROL DEPLOYMENT PLAN');
+  lines.push(`For: ${dateStr}  (forecast by temporal model, per enforcement shift)`);
+  lines.push('');
+  plan.forEach(({ shift, zones }) => {
+    lines.push(`${shift.name.toUpperCase()} — ${String(shift.hour).padStart(2, '0')}:00`);
+    lines.push('-'.repeat(40));
+    zones.forEach((z, i) => {
+      lines.push(`  ${i + 1}. ${z.location || z.junction_name || z.police_station}`);
+      lines.push(`     Station   : ${z.police_station}`);
+      lines.push(`     Predicted : ${riskLabel(z.predicted_score)} (impact ${z.predicted_score}${z.tfi_index !== undefined ? `, TFI ${z.tfi_index}` : ''})`);
+      lines.push(`     Reason    : ${z.block_reason || '—'}`);
+    });
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+// day toggle (Today / Tomorrow)
+const planDayToggle = document.getElementById('planDayToggle');
+if(planDayToggle){
+  planDayToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.plan-day-btn');
+    if(!btn) return;
+    [...planDayToggle.querySelectorAll('.plan-day-btn')].forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    patrolPlanDay = Number(btn.dataset.day);
+    renderPatrolPlan();
+  });
+}
+
+// download deployment plan
+const downloadPlanBtn = document.getElementById('downloadPlanBtn');
+if(downloadPlanBtn){
+  downloadPlanBtn.addEventListener('click', () => {
+    const text = buildPatrolPlanText();
+    if(!text) return;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `patrol-deployment-${lastPatrolPlan ? lastPatrolPlan.dateStr : 'plan'}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

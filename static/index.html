@@ -290,6 +290,117 @@
   .trend-spark{display:inline-flex;align-items:center;gap:1px;height:14px;vertical-align:middle;margin-left:4px;}
   .trend-spark-bar{width:3px;border-radius:1px;background:var(--bar);opacity:0.5;}
   .trend-spark-bar:last-child{opacity:1;}
+
+  /* ---- traffic-flow impact: explainability feature card ---- */
+  .dash-impact-feature{
+    display:grid;grid-template-columns:1.05fr 1fr;gap:0;
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow-soft);overflow:hidden;margin-bottom:20px;
+  }
+  @media (max-width: 820px){ .dash-impact-feature{grid-template-columns:1fr;} }
+  .dash-impact-left{padding:22px 24px;}
+  .dash-impact-right{padding:22px 24px;background:var(--canvas);border-left:1px solid var(--line);}
+  @media (max-width: 820px){ .dash-impact-right{border-left:none;border-top:1px solid var(--line);} }
+  .dash-impact-eyebrow{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;
+    color:var(--high);margin-bottom:8px;
+  }
+  .dash-impact-name{font-size:18px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;margin-bottom:8px;}
+  .dash-impact-sentence{font-size:13px;color:var(--ink-soft);line-height:1.6;margin-bottom:18px;}
+  .dash-impact-sentence b{color:var(--ink);font-weight:600;}
+  .dash-impact-metrics{display:flex;gap:26px;flex-wrap:wrap;}
+  .impact-metric{display:flex;flex-direction:column;gap:2px;}
+  .impact-metric-value{font-size:25px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;line-height:1;}
+  .impact-metric-value.accent{color:var(--high);}
+  .impact-metric-label{font-size:11px;color:var(--muted);max-width:120px;line-height:1.35;}
+
+  .dash-impact-breakdown-title{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
+    color:var(--muted);margin-bottom:14px;
+  }
+  .impact-bar-row{margin-bottom:13px;}
+  .impact-bar-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;}
+  .impact-bar-label{color:var(--ink-soft);font-weight:600;}
+  .impact-bar-val{color:var(--muted);}
+  .impact-bar-track{height:6px;background:var(--line-soft);border-radius:999px;overflow:hidden;}
+  .impact-bar-fill{height:100%;background:var(--accent);border-radius:999px;}
+  .dash-impact-assumptions{
+    font-size:11px;color:var(--muted);line-height:1.5;margin-top:16px;
+    padding-top:13px;border-top:1px dashed var(--line);font-style:italic;
+  }
+
+  /* impact pill used in lists + popups */
+  .tfi-pill{
+    display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;
+    background:var(--high-soft);color:var(--high);
+  }
+
+  /* ---- hub-and-spoke: landing tiles + focused sections ---- */
+  .hub-tiles{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px;}
+  @media (max-width:720px){ .hub-tiles{grid-template-columns:1fr;} }
+  .hub-tile{
+    text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow-soft);padding:20px 22px;cursor:pointer;font-family:inherit;
+    display:flex;flex-direction:column;gap:7px;transition:border-color .15s, box-shadow .15s, transform .05s;
+  }
+  .hub-tile:hover{border-color:var(--accent);box-shadow:var(--shadow);}
+  .hub-tile:active{transform:translateY(1px);}
+  .hub-tile-icon{font-size:22px;line-height:1;}
+  .hub-tile-title{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;}
+  .hub-tile-desc{font-size:13px;color:var(--muted);line-height:1.5;}
+  .hub-tile-stat{font-size:12px;font-weight:600;color:var(--accent);}
+  .hub-tile-arrow{margin-top:6px;font-size:13px;color:var(--accent);font-weight:600;}
+
+  .dash-section-title{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;margin:4px 0 4px;}
+  .dash-section-sub{font-size:13px;color:var(--muted);margin-bottom:20px;}
+  .dash-back{
+    border:1px solid var(--line);background:var(--paper);border-radius:8px;color:var(--ink-soft);
+    font-size:13px;font-weight:600;padding:7px 14px;cursor:pointer;font-family:inherit;margin-bottom:16px;
+  }
+  .dash-back:hover{background:var(--canvas);border-color:var(--accent);color:var(--accent);}
+
+  /* ---- predictive patrol deployment plan ---- */
+  .plan-day-toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .plan-day-btn{
+    border:none;background:var(--paper);font-size:12.5px;font-weight:600;color:var(--muted);
+    padding:7px 14px;cursor:pointer;
+  }
+  .plan-day-btn.active{background:var(--accent);color:#fff;}
+  .patrol-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  @media (max-width: 880px){ .patrol-grid{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width: 520px){ .patrol-grid{grid-template-columns:1fr;} }
+  .patrol-shift{
+    border:1px solid var(--line);border-radius:11px;background:var(--canvas);
+    padding:14px;display:flex;flex-direction:column;gap:10px;
+  }
+  .patrol-shift-head{display:flex;align-items:baseline;justify-content:space-between;}
+  .patrol-shift-name{font-size:13px;font-weight:700;color:var(--ink);}
+  .patrol-shift-time{font-size:12px;color:var(--muted);font-weight:600;}
+  .patrol-zone{
+    background:var(--paper);border:1px solid var(--line-soft);border-radius:8px;
+    padding:9px 10px;cursor:pointer;transition:border-color 0.15s;
+  }
+  .patrol-zone:hover{border-color:var(--accent);}
+  .patrol-zone-top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:3px;}
+  .patrol-zone-name{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .patrol-zone-meta{font-size:11px;color:var(--muted);line-height:1.4;}
+  .patrol-rank{
+    flex:none;width:18px;height:18px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+    font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
+  }
+
+  /* map metric selector + legend caption */
+  .metric-select{
+    border:1px solid var(--line);background:var(--canvas);border-radius:8px;
+    font-size:13px;font-weight:600;color:var(--ink);padding:7px 10px;outline:none;
+    font-family:inherit;cursor:pointer;width:100%;
+  }
+  .metric-select:focus{border-color:var(--accent);}
+  .legend-metric{
+    font-size:11px;color:var(--muted);font-style:italic;padding-left:6px;
+    border-left:1px solid var(--line);margin-left:2px;
+  }
+  .legend-metric span{color:var(--ink-soft);font-style:normal;font-weight:600;}
 </style>
 </head>
 <body>
@@ -330,13 +441,20 @@
   </div>
 
   <div class="legend">
-    <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High risk</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--medium)"></span>Medium</div>
     <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low</div>
+    <span class="legend-metric">by <span id="legendMetric">Traffic-flow impact</span></span>
   </div>
 
   <div class="layer-panel">
-    <div class="layer-title">Layers</div>
+    <div class="layer-title">Colour by</div>
+    <select id="metricSelect" class="metric-select">
+      <option value="impact">Traffic-flow impact</option>
+      <option value="volume">Violation volume</option>
+      <option value="risk">Predicted risk</option>
+    </select>
+    <div class="layer-title" style="margin-top:4px;">Layers</div>
     <label class="layer-toggle">
       <input type="checkbox" id="heatToggle" checked />
       Heatmap
@@ -355,30 +473,20 @@
 
 <div id="dashboardView">
   <div class="dashboard-wrap">
-    <div class="dashboard-title">Police Station Priority Dashboard</div>
 
-    <div class="dash-toolbar-row">
-      <div class="dash-station-search-wrap">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="dashStationSearch" type="text" placeholder="Search police station…" autocomplete="off" />
-        <div class="dash-suggestions" id="dashStationSuggestions" style="display:none;"></div>
+    <!-- ===================== HUB (landing) ===================== -->
+    <div id="dashHub">
+      <div class="dashboard-title">Parking-Congestion Command Centre</div>
+
+      <div class="dash-time-filters" id="dashTimeFilters">
+        <button class="dash-time-chip active" data-when="now">Now</button>
+        <button class="dash-time-chip" data-when="today-peak">Today peak hour</button>
+        <button class="dash-time-chip" data-when="weekend-night">Weekend night</button>
+        <button class="dash-time-chip" data-when="all">All-time (no filter)</button>
       </div>
-      <button class="dash-report-btn" id="generateReportBtn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-        Generate Patrol Report
-      </button>
-    </div>
 
-    <div class="dash-time-filters" id="dashTimeFilters">
-      <button class="dash-time-chip active" data-when="now">Now</button>
-      <button class="dash-time-chip" data-when="today-peak">Today peak hour</button>
-      <button class="dash-time-chip" data-when="weekend-night">Weekend night</button>
-      <button class="dash-time-chip" data-when="all">All-time (no filter)</button>
-    </div>
+      <div class="dash-headline" id="dashHeadline"></div>
 
-    <div class="dash-headline" id="dashHeadline"></div>
-
-    <div id="dashboardDefault">
       <div class="dash-stats-row">
         <div class="dash-stat-card">
           <div class="dash-stat-label">Total areas</div>
@@ -397,6 +505,108 @@
           <div class="dash-stat-value" id="cityStatStations">—</div>
         </div>
       </div>
+
+      <div class="hub-tiles">
+        <button class="hub-tile" data-section="impact">
+          <span class="hub-tile-icon">🚦</span>
+          <span class="hub-tile-title">Traffic-Flow Impact</span>
+          <span class="hub-tile-desc">Quantify how much each hotspot chokes the carriageway — and see exactly why it scores high.</span>
+          <span class="hub-tile-stat" id="tileImpactStat"></span>
+          <span class="hub-tile-arrow">Open →</span>
+        </button>
+        <button class="hub-tile" data-section="patrol">
+          <span class="hub-tile-icon">🚓</span>
+          <span class="hub-tile-title">Patrol Deployment</span>
+          <span class="hub-tile-desc">A model-scheduled enforcement roster: which zones to patrol at each shift.</span>
+          <span class="hub-tile-stat">4 shifts · forecast by the temporal model</span>
+          <span class="hub-tile-arrow">Open →</span>
+        </button>
+        <button class="hub-tile" data-section="analytics">
+          <span class="hub-tile-icon">📊</span>
+          <span class="hub-tile-title">Hotspot Analytics</span>
+          <span class="hub-tile-desc">Rankings, citywide risk mix, rising/falling trends and frequency × severity.</span>
+          <span class="hub-tile-stat" id="tileAnalyticsStat"></span>
+          <span class="hub-tile-arrow">Open →</span>
+        </button>
+        <button class="hub-tile" data-section="stations">
+          <span class="hub-tile-icon">🏢</span>
+          <span class="hub-tile-title">Police Stations</span>
+          <span class="hub-tile-desc">Search any station to drill into its own priority areas and busiest spots.</span>
+          <span class="hub-tile-stat" id="tileStationsStat"></span>
+          <span class="hub-tile-arrow">Open →</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================== SECTION: Traffic-Flow Impact ===================== -->
+    <div id="sectionImpact" class="dash-section" style="display:none;">
+      <button class="dash-back">← Dashboard</button>
+      <div class="dash-section-title">Traffic-Flow Impact</div>
+      <div class="dash-section-sub">How much each hotspot obstructs the carriageway, quantified and explained.</div>
+
+      <div class="dash-impact-feature" id="dashImpactFeature">
+        <div class="dash-impact-left">
+          <div class="dash-impact-eyebrow">Worst carriageway chokepoint</div>
+          <div class="dash-impact-name" id="impactName">—</div>
+          <div class="dash-impact-sentence" id="impactSentence"></div>
+          <div class="dash-impact-metrics">
+            <div class="impact-metric">
+              <div class="impact-metric-value accent" id="impactTfi">—</div>
+              <div class="impact-metric-label">Traffic-Flow Impact / 100</div>
+            </div>
+            <div class="impact-metric">
+              <div class="impact-metric-value" id="impactLaneCut">—</div>
+              <div class="impact-metric-label">est. lane capacity cut</div>
+            </div>
+            <div class="impact-metric">
+              <div class="impact-metric-value" id="impactVeh">—</div>
+              <div class="impact-metric-label">est. vehicles delayed / peak hr</div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-impact-right">
+          <div class="dash-impact-breakdown-title">Why this score</div>
+          <div id="impactBreakdown"></div>
+          <div class="dash-impact-assumptions" id="impactAssumptions"></div>
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dash-panel-header">
+          <span class="dash-panel-title">Top carriageway chokepoints <b>(by traffic-flow impact)</b> — click to explain</span>
+        </div>
+        <div id="topChokepointsList"></div>
+      </div>
+    </div>
+
+    <!-- ===================== SECTION: Patrol Deployment ===================== -->
+    <div id="sectionPatrol" class="dash-section" style="display:none;">
+      <button class="dash-back">← Dashboard</button>
+      <div class="dash-section-title">Predictive Patrol Deployment</div>
+      <div class="dash-section-sub">The temporal model forecasts the worst zones for each enforcement shift, deduped across stations so patrols spread out.</div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <div class="plan-day-toggle" id="planDayToggle">
+          <button class="plan-day-btn active" data-day="0">Today</button>
+          <button class="plan-day-btn" data-day="1">Tomorrow</button>
+        </div>
+        <button class="dash-report-btn" id="downloadPlanBtn">Download plan</button>
+        <button class="dash-report-btn" id="generateReportBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+          Priority report
+        </button>
+      </div>
+
+      <div class="dash-panel">
+        <div id="patrolPlanBody"><div class="dash-bar-meta">Generating plan…</div></div>
+      </div>
+    </div>
+
+    <!-- ===================== SECTION: Hotspot Analytics ===================== -->
+    <div id="sectionAnalytics" class="dash-section" style="display:none;">
+      <button class="dash-back">← Dashboard</button>
+      <div class="dash-section-title">Hotspot Analytics</div>
+      <div class="dash-section-sub">Citywide rankings, risk mix, momentum and the frequency × severity matrix.</div>
 
       <div class="dash-default-grid">
         <div class="dash-panel">
@@ -430,44 +640,58 @@
           <div class="quadrant-grid" id="quadrantGrid"></div>
         </div>
       </div>
-
-      <div class="dash-panel" style="margin-top:14px;">
-        <div class="dash-panel-header">
-          <span class="dash-panel-title">Busiest police stations (by total violations)</span>
-        </div>
-        <div id="topStationsList"></div>
-      </div>
-
-      <div class="dashboard-hint">Search a police station above to drill into its own priority list.</div>
     </div>
 
-    <div id="dashboardResults" style="display:none;">
-      <div class="dash-stats-row">
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Areas</div>
-          <div class="dash-stat-value" id="statAreas">—</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Total violations</div>
-          <div class="dash-stat-value" id="statViolations">—</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">High-risk areas</div>
-          <div class="dash-stat-value" id="statHighRisk">—</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-label">Rising-trend areas</div>
-          <div class="dash-stat-value" id="statRising">—</div>
+    <!-- ===================== SECTION: Police Stations ===================== -->
+    <div id="sectionStations" class="dash-section" style="display:none;">
+      <button class="dash-back">← Dashboard</button>
+      <div class="dash-section-title">Police Stations</div>
+      <div class="dash-section-sub">Search a station to drill into its own priority areas.</div>
+
+      <div class="dash-station-search-wrap" style="margin-bottom:20px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="dashStationSearch" type="text" placeholder="Search police station…" autocomplete="off" />
+        <div class="dash-suggestions" id="dashStationSuggestions" style="display:none;"></div>
+      </div>
+
+      <div id="stationsDefault">
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Busiest police stations (by total violations)</span>
+          </div>
+          <div id="topStationsList"></div>
         </div>
       </div>
 
-      <div class="dash-panel">
-        <div class="dash-panel-header">
-          <span class="dash-panel-title">Priority areas in <b id="dashStationName"></b></span>
+      <div id="dashboardResults" style="display:none;">
+        <div class="dash-stats-row">
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">Areas</div>
+            <div class="dash-stat-value" id="statAreas">—</div>
+          </div>
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">Total violations</div>
+            <div class="dash-stat-value" id="statViolations">—</div>
+          </div>
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">High-risk areas</div>
+            <div class="dash-stat-value" id="statHighRisk">—</div>
+          </div>
+          <div class="dash-stat-card">
+            <div class="dash-stat-label">Rising-trend areas</div>
+            <div class="dash-stat-value" id="statRising">—</div>
+          </div>
         </div>
-        <div id="dashAreaList"></div>
+
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Priority areas in <b id="dashStationName"></b></span>
+          </div>
+          <div id="dashAreaList"></div>
+        </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -488,10 +712,12 @@ let queryMarker = null;
 let heatLayer = null;
 let allClusters = [];
 
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
 function riskColor(score){
-  if(score >= 0.35) return getComputedStyle(document.documentElement).getPropertyValue('--high').trim();
-  if(score >= 0.12) return getComputedStyle(document.documentElement).getPropertyValue('--medium').trim();
-  return getComputedStyle(document.documentElement).getPropertyValue('--low').trim();
+  if(score >= 0.35) return cssVar('--high');
+  if(score >= 0.12) return cssVar('--medium');
+  return cssVar('--low');
 }
 function riskLabel(score){
   if(score >= 0.35) return 'high';
@@ -499,25 +725,65 @@ function riskLabel(score){
   return 'low';
 }
 
-async function loadClusters(){
-  const whenParam = timeInput && timeInput.value ? `?when=${encodeURIComponent(timeInput.value)}` : '';
-  const res = await fetch(`${API}/api/clusters${whenParam}`);
-  const data = await res.json();
-  allClusters = data.clusters;
+// ---- map colour metric: switch what the heatmap/markers represent ----
+// 'impact' = traffic-flow impact (TFI), 'volume' = raw violation count,
+// 'risk' = time-aware predicted risk. Lets you SEE violations-vs-impact.
+let heatMetric = 'impact';
+let volumeThresholds = { hi: 0, mid: 0 };
+
+const METRIC_LABELS = {
+  impact: 'Traffic-flow impact',
+  volume: 'Violation volume',
+  risk: 'Predicted risk (time-aware)',
+};
+
+function percentile(sortedAsc, p){
+  if(!sortedAsc.length) return 0;
+  const idx = Math.min(sortedAsc.length - 1, Math.floor(p * sortedAsc.length));
+  return sortedAsc[idx];
+}
+
+function clusterColor(c){
+  if(heatMetric === 'volume'){
+    if(c.violations >= volumeThresholds.hi) return cssVar('--high');
+    if(c.violations >= volumeThresholds.mid) return cssVar('--medium');
+    return cssVar('--low');
+  }
+  if(heatMetric === 'impact'){
+    const t = (c.tfi_index === undefined) ? 0 : c.tfi_index;
+    if(t >= 66) return cssVar('--high');
+    if(t >= 33) return cssVar('--medium');
+    return cssVar('--low');
+  }
+  return riskColor(c.predicted_score); // 'risk'
+}
+
+// Build (or rebuild) the marker + glow layers for a set of clusters, coloured
+// by the active metric. Called on fetch AND on metric toggle (no refetch).
+function renderClusterLayers(clusters){
   clusterMarkers.forEach(m => map.removeLayer(m));
   clusterMarkers = [];
-
   if(heatLayer){ map.removeLayer(heatLayer); heatLayer = null; }
+  heatLayer = L.layerGroup();
 
-  heatLayer = L.layerGroup();  // per-cluster glow circles, colored like markers, no additive saturation
+  // volume tertiles for the 'volume' metric colour buckets
+  const vols = clusters.map(c => c.violations).sort((a, b) => a - b);
+  volumeThresholds = { hi: percentile(vols, 0.66), mid: percentile(vols, 0.33) };
 
-  data.clusters.forEach(c => {
-    const color = riskColor(c.predicted_score);
+  clusters.forEach(c => {
+    const color = clusterColor(c);
     const radius = Math.min(22, 6 + Math.sqrt(c.violations));
     const marker = L.circleMarker([c.latitude, c.longitude], {
       radius, color, fillColor: color, fillOpacity: 0.55, weight: 1.5
     }).addTo(map);
 
+    const tfiLine = (c.tfi_index !== undefined) ? `
+      <div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee;">
+        Traffic-flow impact: <span class="popup-score">${c.tfi_index}/100</span>
+        &middot; ~${c.pct_lane_capacity_cut}% lane cut
+        &middot; ~${c.veh_affected_peak} veh/hr delayed at peak
+      </div>
+      <div style="font-size:12px;color:#777;">Mainly ${c.block_reason || '—'}</div>` : '';
     marker.bindPopup(`
       <div class="popup-title">${c.location || c.police_station}</div>
       <div>Police station: <b>${c.police_station}</b></div>
@@ -525,6 +791,7 @@ async function loadClusters(){
       <div>Violations recorded: <b>${c.violations}</b></div>
       <div>Predicted impact (at selected time): <span class="popup-score">${c.predicted_score}</span></div>
       <div>Avg severity: <span class="popup-score">${c.avg_impact}</span></div>
+      ${tfiLine}
     `);
     marker.on('click', () => {
       selectedLocation = { lat: c.latitude, lng: c.longitude, label: c.location || c.police_station };
@@ -533,8 +800,7 @@ async function loadClusters(){
     });
     clusterMarkers.push(marker);
 
-    // one soft glow disc per cluster, colored by the SAME riskColor() the markers use.
-    // Size scales a little with violations; color updates with time exactly like the markers.
+    // one soft glow disc per cluster, coloured by the SAME metric as the markers.
     const glowPx = 38 + Math.min(34, Math.sqrt(c.violations));
     const glowIcon = L.divIcon({
       className: '',
@@ -546,15 +812,32 @@ async function loadClusters(){
   });
 
   if(document.getElementById('heatToggle').checked) heatLayer.addTo(map);
-  document.getElementById('statusText').textContent =
-    `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
-
   clusterMarkers.forEach(m => {
     if(!document.getElementById('markersToggle').checked) map.removeLayer(m);
   });
+  updateLegendCaption();
+}
 
+function updateLegendCaption(){
+  const el = document.getElementById('legendMetric');
+  if(el) el.textContent = METRIC_LABELS[heatMetric];
+}
+
+async function loadClusters(){
+  const whenParam = timeInput && timeInput.value ? `?when=${encodeURIComponent(timeInput.value)}` : '';
+  const res = await fetch(`${API}/api/clusters${whenParam}`);
+  const data = await res.json();
+  allClusters = data.clusters;
+  renderClusterLayers(allClusters);
+  document.getElementById('statusText').textContent =
+    `${data.clusters.length} hotspots · updated ${new Date(data.last_loaded).toLocaleTimeString()}`;
   return data.clusters;
 }
+
+document.getElementById('metricSelect').addEventListener('change', (e) => {
+  heatMetric = e.target.value;
+  if(allClusters.length) renderClusterLayers(allClusters);  // recolour, no refetch
+});
 
 document.getElementById('heatToggle').addEventListener('change', (e) => {
   if(!heatLayer) return;

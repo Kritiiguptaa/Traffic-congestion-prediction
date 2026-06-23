@@ -117,6 +117,75 @@ W_JUNCTION  = 0.22
 W_RECENCY   = 0.13
 W_DOW       = 0.13
 
+# ─────────────────────────────────────────────
+# CARRIAGEWAY IMPACT MODEL  — "quantify impact on traffic flow"
+# ─────────────────────────────────────────────
+# Unlike the generic priority score above, this models how much a violation
+# physically OBSTRUCTS the carriageway (moving lanes). This is the key
+# distinction for parking-induced congestion: a double-parked car blocks a
+# lane; a rider without a helmet blocks nothing.
+#
+# LANE_BLOCK_WEIGHT ∈ [0,1]:  1.0 = fully blocks a moving lane,
+#                             0.0 = no carriageway obstruction at all.
+LANE_BLOCK_WEIGHT = {
+    # SEVERE — directly blocks a moving/through lane
+    "DOUBLE PARKING": 1.00,
+    "PARKING IN A MAIN ROAD": 0.90,
+    "PARKING OPPOSITE TO ANOTHER PARKED VEHICLE": 0.85,  # creates a chokepoint
+    "AGAINST ONE WAY/NO ENTRY": 0.80,
+    "PARKING NEAR TRAFFIC LIGHT OR ZEBRA CROSS": 0.80,
+    "H T V PROHIBITED": 0.75,
+
+    # HIGH — blocks flow at a critical point / partial lane
+    "VIOLATING LANE DISIPLINE": 0.65,
+    "STOPING ON WHITE/STOP LINE": 0.60,
+    "WRONG PARKING": 0.60,
+    "PARKING NEAR BUSTOP/SCHOOL/HOSPITAL ETC": 0.60,
+    "U TURN PROHIBITED": 0.55,
+
+    # MEDIUM — narrows the carriageway / kerb-side obstruction
+    "NO PARKING": 0.50,
+    "PARKING NEAR ROAD CROSSING": 0.50,
+    "PARKING OTHER THAN BUS STOP": 0.45,
+    "CARRYING LENGHTY MATERIAL": 0.40,
+    "OBSTRUCTING DRIVER": 0.40,
+    "JUMPING TRAFFIC SIGNAL": 0.30,  # transient, not a standing blockage
+
+    # LOW — pushes obstruction onto footpath, not the carriageway
+    "PARKING ON FOOTPATH": 0.15,
+
+    # NONE — moving / paperwork / safety violations, zero carriageway impact
+    "2W/3W - USING MOBILE PHONE": 0.0,
+    "OTHER - USING MOBILE PHONE": 0.0,
+    "FAIL TO USE SAFETY BELTS": 0.0,
+    "RIDER NOT WEARING HELMET": 0.0,
+    "DEFECTIVE NUMBER PLATE": 0.0,
+    "WITHOUT SIDE MIRROR": 0.0,
+    "USING BLACK FILM/OTHER MATERIALS": 0.0,
+    "DEMANDING EXCESS FARE": 0.0,
+    "REFUSE TO GO FOR HIRE": 0.0,
+}
+DEFAULT_LANE_BLOCK = 0.40  # unknown type → assume moderate obstruction
+
+# Vehicle footprint = relative carriageway area a stopped vehicle occupies.
+# Derived from the existing vehicle priority tiers (1=2W/auto, 2=car, 3=bus/truck).
+VEHICLE_FOOTPRINT = {1: 0.40, 2: 1.00, 3: 2.20}
+
+# Junction amplification: a vehicle obstructing at/near a junction backs up
+# far more traffic (queue spillback) than one mid-block.
+JUNCTION_AMPLIFY = 1.50
+
+# Max possible per-incident obstruction (worst weight × worst footprint × junction),
+# used to normalise obstruction intensity to [0,1].
+MAX_ROW_BLOCK = 1.00 * 2.20 * JUNCTION_AMPLIFY  # = 3.30
+
+# Illustrative traffic assumptions (clearly-labelled estimates, shown in the UI):
+#   LANE_FLOW  — typical urban-arterial throughput per lane at peak (veh/hr).
+#                Conservative vs the ~1800 pcphpl textbook saturation flow.
+#   MAX_CAP_CUT — worst-case share of one lane's capacity a chronic hotspot cuts.
+LANE_FLOW = 1500
+MAX_CAP_CUT = 0.50
+
 TIMESTAMP_CANDIDATES = [
     "created_datetime_ist", "created_datetime",
     "modified_datetime_ist", "modified_datetime",
@@ -137,6 +206,30 @@ def _violation_score(v):
         return max(scores)
     except Exception:
         return VIOLATION_PRIORITY.get(str(v).strip().upper(), DEFAULT_VIOLATION_PRIORITY)
+
+
+def _parse_violation_list(v):
+    """Normalise a row's violation_type (list-string or scalar) to an UPPER list."""
+    try:
+        vals = ast.literal_eval(v) if isinstance(v, str) else v
+        return [str(x).strip().upper() for x in vals]
+    except Exception:
+        return [str(v).strip().upper()]
+
+
+def _lane_block_score(v):
+    """Worst carriageway-obstruction weight among a row's violation types [0,1]."""
+    vals = _parse_violation_list(v)
+    return max((LANE_BLOCK_WEIGHT.get(x, DEFAULT_LANE_BLOCK) for x in vals), default=DEFAULT_LANE_BLOCK)
+
+
+def _top_block_violation(v):
+    """The single violation type in a row that contributes the most obstruction —
+    used to explain *why* a hotspot is congested (the dominant blocking cause)."""
+    vals = _parse_violation_list(v)
+    if not vals:
+        return ""
+    return max(vals, key=lambda x: LANE_BLOCK_WEIGHT.get(x, DEFAULT_LANE_BLOCK))
 
 
 # ─────────────────────────────────────────────
@@ -187,6 +280,16 @@ def load_and_score(filepath: str) -> pd.DataFrame:
 
     # ── junction flag ──
     df["junction_flag"] = df["junction_name"].apply(_junction_flag)   # 0 or 1
+
+    # ── carriageway obstruction (traffic-flow impact model) ──
+    df["lane_block"] = df["violation_type"].apply(_lane_block_score)        # [0, 1]
+    df["top_block_violation"] = df["violation_type"].apply(_top_block_violation)
+    df["vehicle_footprint"] = df["vehicle_priority"].map(VEHICLE_FOOTPRINT).fillna(1.0)
+    junction_mult = np.where(df["junction_flag"] == 1, JUNCTION_AMPLIFY, 1.0)
+    # per-incident obstruction, normalised to [0, 1] against the worst possible case
+    df["obstruction_intensity"] = (
+        df["lane_block"] * df["vehicle_footprint"] * junction_mult / MAX_ROW_BLOCK
+    ).clip(0, 1)
 
     # ── normalise all components to [0, 1] ──
     norm_violation = (df["violation_priority"] - 1) / 2    # 1..3 -> 0..1
@@ -318,6 +421,72 @@ def build_cluster_stats(df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
 
+    # ── traffic-flow impact: quantify how much each hotspot chokes the carriageway ──
+    cluster_stats = _add_traffic_flow_impact(cluster_stats, hotspots)
+
+    return cluster_stats
+
+
+def _add_traffic_flow_impact(cluster_stats: pd.DataFrame, hotspots: pd.DataFrame) -> pd.DataFrame:
+    """Quantify each hotspot's impact on traffic flow and attach explainable
+    components. Produces:
+      tfi_index            — Traffic-Flow Impact, 0..100 (headline ranking metric)
+      obstruction_intensity— mean per-incident carriageway obstruction, 0..1
+      pct_lane_capacity_cut— est. % of one lane's capacity lost (illustrative)
+      veh_affected_peak    — est. vehicles delayed per peak hour (illustrative)
+      junction_share       — fraction of incidents at/near a junction
+      mean_footprint       — mean vehicle footprint (lane area occupied)
+      volume_factor        — 0..1, how sustained/repeated the blockage is
+      block_reason         — dominant blocking violation type (plain-English cause)
+    """
+    if not {"obstruction_intensity", "lane_block"}.issubset(hotspots.columns):
+        # impact columns missing (older data path) — fill neutral defaults
+        for col, val in [("tfi_index", 0), ("obstruction_intensity", 0.0),
+                         ("pct_lane_capacity_cut", 0.0), ("veh_affected_peak", 0),
+                         ("junction_share", 0.0), ("mean_footprint", 1.0),
+                         ("volume_factor", 0.0), ("block_reason", "")]:
+            cluster_stats[col] = val
+        return cluster_stats
+
+    imp = hotspots.groupby("cluster_id").agg(
+        obstruction_intensity=("obstruction_intensity", "mean"),
+        mean_footprint=("vehicle_footprint", "mean"),
+        junction_share=("junction_flag", "mean"),
+        block_reason=("top_block_violation",
+                      lambda x: x.mode().iloc[0] if not x.mode().empty else ""),
+    ).reset_index()
+    cluster_stats = cluster_stats.merge(imp, on="cluster_id", how="left")
+
+    # volume/persistence: a hotspot blocking the road repeatedly matters more than
+    # a one-off. Log-scaled so a handful of huge clusters don't flatten everything.
+    max_v = max(cluster_stats["violations"].max(), 1)
+    cluster_stats["volume_factor"] = (
+        np.log1p(cluster_stats["violations"]) / np.log1p(max_v)
+    ).round(3)
+
+    # Traffic-Flow Impact: obstruction severity dominates, modulated by how
+    # sustained the blockage is. Scaled to 0..100 across all hotspots for ranking.
+    tfi_raw = cluster_stats["obstruction_intensity"] * (0.5 + 0.5 * cluster_stats["volume_factor"])
+    tfi_max = max(tfi_raw.max(), 1e-9)
+    cluster_stats["tfi_index"] = (tfi_raw / tfi_max * 100).round().astype(int)
+
+    # Tangible, clearly-labelled estimates of the flow impact.
+    cluster_stats["pct_lane_capacity_cut"] = (
+        cluster_stats["obstruction_intensity"] * MAX_CAP_CUT * 100
+    ).round(1)
+    med_v = max(cluster_stats["violations"].median(), 1)
+    persistence = (cluster_stats["violations"] / med_v).clip(0.2, 1.5)
+    cluster_stats["veh_affected_peak"] = (
+        cluster_stats["obstruction_intensity"] * MAX_CAP_CUT * LANE_FLOW * persistence
+    ).round().astype(int)
+
+    # tidy up the explainability fields
+    cluster_stats["obstruction_intensity"] = cluster_stats["obstruction_intensity"].round(3)
+    cluster_stats["mean_footprint"] = cluster_stats["mean_footprint"].round(2)
+    cluster_stats["junction_share"] = cluster_stats["junction_share"].round(3)
+    cluster_stats["block_reason"] = (
+        cluster_stats["block_reason"].fillna("").astype(str).str.title()
+    )
     return cluster_stats
 
 
