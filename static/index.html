@@ -150,9 +150,38 @@
     border:none;background:transparent;color:var(--accent);font-size:12px;cursor:pointer;font-weight:600;padding:0;
   }
 
-  .leaflet-popup-content{font-size:13px;line-height:1.5;}
+  .leaflet-popup-content{font-size:13px;line-height:1.5;margin:13px 15px;}
   .popup-title{font-weight:700;margin-bottom:3px;}
   .popup-score{color:var(--accent);font-weight:700;}
+
+  /* ---- impact-focused hotspot popup ---- */
+  .pop{width:248px;}
+  .pop-loc{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.35;margin-bottom:11px;}
+  .pop-tfi{
+    display:flex;align-items:baseline;gap:8px;margin-bottom:3px;
+  }
+  .pop-tfi-num{font-size:34px;font-weight:800;letter-spacing:-0.02em;line-height:1;}
+  .pop-tfi-max{font-size:14px;font-weight:600;color:var(--muted);}
+  .pop-tfi-label{font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .pop-bar{height:7px;border-radius:999px;background:var(--line-soft);overflow:hidden;margin-bottom:12px;}
+  .pop-bar-fill{height:100%;border-radius:999px;}
+  .pop-metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px;}
+  .pop-metric{background:var(--canvas);border-radius:9px;padding:8px 10px;}
+  .pop-metric-val{font-size:16px;font-weight:700;color:var(--ink);line-height:1.1;}
+  .pop-metric-lbl{font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.25;}
+  .pop-cause{font-size:12px;color:var(--ink-soft);margin-bottom:11px;}
+  .pop-cause b{color:var(--ink);}
+  .pop-foot{
+    border-top:1px solid var(--line-soft);padding-top:9px;
+    font-size:11.5px;color:var(--muted);line-height:1.55;
+  }
+  .pop-foot b{color:var(--ink-soft);font-weight:600;}
+  .pop-pill{
+    display:inline-block;font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:999px;
+  }
+  .pop-pill.high{background:var(--high-soft);color:var(--high);}
+  .pop-pill.medium{background:var(--medium-soft);color:var(--medium);}
+  .pop-pill.low{background:var(--low-soft);color:var(--low);}
 
   /* ---- layer toggle panel (top right, below status) ---- */
   .layer-panel{
@@ -778,22 +807,42 @@ function renderClusterLayers(clusters){
       radius, color, fillColor: color, fillOpacity: 0.55, weight: 1.5
     }).addTo(map);
 
-    const tfiLine = (c.tfi_index !== undefined) ? `
-      <div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee;">
-        Traffic-flow impact: <span class="popup-score">${c.tfi_index}/100</span>
-        &middot; ~${c.pct_lane_capacity_cut}% lane cut
-        &middot; ~${c.veh_affected_peak} veh/hr delayed at peak
+    const tfi = (c.tfi_index !== undefined) ? c.tfi_index : null;
+    // impact tier drives the hero colour + pill, matching the map legend
+    const tier = tfi === null ? 'low' : (tfi >= 66 ? 'high' : tfi >= 33 ? 'medium' : 'low');
+    const tierColor = tier === 'high' ? 'var(--high)' : tier === 'medium' ? 'var(--medium)' : 'var(--low)';
+    const tierWord = tier === 'high' ? 'High' : tier === 'medium' ? 'Moderate' : 'Low';
+
+    const impactBody = (tfi !== null) ? `
+      <div class="pop-tfi">
+        <span class="pop-tfi-num" style="color:${tierColor}">${tfi}</span>
+        <span class="pop-tfi-max">/100</span>
+        <span class="pop-pill ${tier}" style="margin-left:auto;">${tierWord} impact</span>
       </div>
-      <div style="font-size:12px;color:#777;">Mainly ${c.block_reason || '—'}</div>` : '';
+      <div class="pop-tfi-label">Traffic-flow impact</div>
+      <div class="pop-bar"><div class="pop-bar-fill" style="width:${Math.max(4, tfi)}%;background:${tierColor};"></div></div>
+      <div class="pop-metrics">
+        <div class="pop-metric">
+          <div class="pop-metric-val">~${c.pct_lane_capacity_cut}%</div>
+          <div class="pop-metric-lbl">lane capacity cut</div>
+        </div>
+        <div class="pop-metric">
+          <div class="pop-metric-val">~${c.veh_affected_peak}</div>
+          <div class="pop-metric-lbl">veh/hr delayed at peak</div>
+        </div>
+      </div>
+      <div class="pop-cause">Main cause: <b>${c.block_reason || '—'}</b></div>` : '';
+
     marker.bindPopup(`
-      <div class="popup-title">${c.location || c.police_station}</div>
-      <div>Police station: <b>${c.police_station}</b></div>
-      <div>Junction: <b>${c.junction_name || '—'}</b></div>
-      <div>Violations recorded: <b>${c.violations}</b></div>
-      <div>Predicted impact (at selected time): <span class="popup-score">${c.predicted_score}</span></div>
-      <div>Avg severity: <span class="popup-score">${c.avg_impact}</span></div>
-      ${tfiLine}
-    `);
+      <div class="pop">
+        <div class="pop-loc">${c.location || c.police_station}</div>
+        ${impactBody}
+        <div class="pop-foot">
+          <b>${c.violations.toLocaleString()}</b> violations &middot; ${c.police_station}${c.junction_name && c.junction_name !== 'No Junction' ? ' &middot; ' + c.junction_name : ''}<br>
+          Avg severity <b>${c.avg_impact}</b> &middot; predicted now <b>${c.predicted_score}</b>
+        </div>
+      </div>
+    `, { maxWidth: 280, minWidth: 248 });
     marker.on('click', () => {
       selectedLocation = { lat: c.latitude, lng: c.longitude, label: c.location || c.police_station };
       searchInput.value = selectedLocation.label;
