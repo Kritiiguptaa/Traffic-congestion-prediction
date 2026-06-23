@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.vscode/
+.idea/
+server_run.log
+server_err.log
+# dataset is downloaded during build, not copied
+*.xlsx
+*.xls
+hotspots.csv

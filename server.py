@@ -188,6 +188,11 @@ def api_status():
     })
 
 
+# Load model state at import time so the app works under ANY WSGI server
+# (gunicorn, waitress, …) — not only `python server.py`. Production servers
+# import `server:app` without running the __main__ block below.
+load_state()
+
 if __name__ == "__main__":
-    load_state()
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True, use_reloader=False)
