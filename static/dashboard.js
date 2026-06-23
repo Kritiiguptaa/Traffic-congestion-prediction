@@ -99,6 +99,11 @@ function renderDashboardDefault(){
   document.getElementById('cityStatHighRisk').textContent = highRiskCount;
   document.getElementById('cityStatStations').textContent = stationCount;
 
+  // NEW: headline banner — quick "why this matters" framing for judges
+  renderDashHeadline(allClusters, totalViolations, highRiskCount);
+  // NEW: quadrant visual (frequency x severity)
+  renderQuadrantGrid(allClusters);
+
   // top priority areas, citywide
   const top = allClusters.slice().sort((a, b) => b.predicted_score - a.predicted_score).slice(0, 5);
   const topMaxScore = Math.max(...top.map(a => a.predicted_score), 0.001);
@@ -116,7 +121,7 @@ function renderDashboardDefault(){
         </div>
         <div class="dash-bar-meta">
           Impact <b>${a.predicted_score}</b> &middot; <b>${a.police_station}</b> &middot; ${a.violations} violations &middot;
-          Peak <b>${a.peak_dow_name || '—'} ~${formatHour(a.peak_hour)}</b>
+          Peak <b>${a.peak_dow_name || '—'} ~${formatHour(a.peak_hour)}</b> ${trendSpark(a.trend_label, a.trend_pct)}
         </div>
       </div>
     `;
@@ -176,7 +181,7 @@ function renderDashboardDefault(){
         </div>
         <div class="dash-bar-meta">
           <b>${a.violations}</b> violations &middot; <b>${a.police_station}</b> &middot;
-          Impact <b>${a.predicted_score}</b> &middot; Peak <b>${a.peak_dow_name || '—'} ~${formatHour(a.peak_hour)}</b>
+          Impact <b>${a.predicted_score}</b> &middot; Peak <b>${a.peak_dow_name || '—'} ~${formatHour(a.peak_hour)}</b> ${trendSpark(a.trend_label, a.trend_pct)}
         </div>
       </div>
     `;
@@ -290,7 +295,7 @@ function renderStationDashboard(station){
           Impact <b>${a.predicted_score}</b> &middot; ${a.violations} violations &middot;
           Peak <b>${a.peak_dow_name || '—'} ~${formatHour(a.peak_hour)}</b> &middot;
           <span class="trend-${a.trend_label}">${trendArrow(a.trend_label)} ${a.trend_label}</span>
-          (${a.trend_pct > 0 ? '+' : ''}${a.trend_pct}%) &middot; ${a.quadrant || '—'} &middot;
+          (${a.trend_pct > 0 ? '+' : ''}${a.trend_pct}%) ${trendSpark(a.trend_label, a.trend_pct)} &middot; ${a.quadrant || '—'} &middot;
           <a href="#" class="dash-view-link" data-idx="${i}">View on map</a>
         </div>
       </div>
@@ -307,5 +312,160 @@ function renderStationDashboard(station){
       map.flyTo([a.latitude, a.longitude], 16, { duration: 0.6 });
       runPrediction();
     });
+  });
+}
+
+// ==========================================================================
+// NEW (hackathon polish pass): headline banner, time filters, patrol report
+// export, quadrant visual, trend sparklines. Nothing above this point was
+// removed — only extended (see trendSpark()/renderDashHeadline() call-outs).
+// ==========================================================================
+
+// ---- NEW: headline stat banner ----
+function renderDashHeadline(clusters, totalViolations, highRiskCount){
+  const el = document.getElementById('dashHeadline');
+  if(!el) return;
+
+  const sorted = clusters.slice().sort((a, b) => b.violations - a.violations);
+  const top10 = sorted.slice(0, 10);
+  const top10Violations = top10.reduce((s, a) => s + a.violations, 0);
+  const concentrationPct = totalViolations > 0 ? Math.round((top10Violations / totalViolations) * 100) : 0;
+  const risingCount = clusters.filter(c => c.trend_label === 'rising').length;
+
+  el.innerHTML = `
+    <div class="dash-headline-item">
+      <span class="dash-headline-value">${highRiskCount} high-risk zones</span>
+      <span class="dash-headline-label">out of ${clusters.length} tracked areas</span>
+    </div>
+    <div class="dash-headline-item">
+      <span class="dash-headline-value">${concentrationPct}% of violations</span>
+      <span class="dash-headline-label">concentrated in just the top 10 areas</span>
+    </div>
+    <div class="dash-headline-item">
+      <span class="dash-headline-value">${risingCount} areas trending up</span>
+      <span class="dash-headline-label">worth proactive patrol attention</span>
+    </div>
+  `;
+}
+
+// ---- NEW: time filter chips — quick presets that set timeInput + reload ----
+const dashTimeFiltersEl = document.getElementById('dashTimeFilters');
+if(dashTimeFiltersEl){
+  dashTimeFiltersEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.dash-time-chip');
+    if(!btn) return;
+    [...dashTimeFiltersEl.querySelectorAll('.dash-time-chip')].forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+
+    const preset = btn.dataset.when;
+    const now = new Date();
+
+    if(preset === 'now'){
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      timeInput.value = now.toISOString().slice(0, 16);
+    } else if(preset === 'today-peak'){
+      // use 9 AM today as a representative morning-peak slot
+      now.setHours(9, 0, 0, 0);
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      timeInput.value = now.toISOString().slice(0, 16);
+    } else if(preset === 'weekend-night'){
+      // next Saturday, 9 PM
+      const day = now.getDay();
+      const daysUntilSat = (6 - day + 7) % 7;
+      now.setDate(now.getDate() + daysUntilSat);
+      now.setHours(21, 0, 0, 0);
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      timeInput.value = now.toISOString().slice(0, 16);
+    } else if(preset === 'all'){
+      timeInput.value = '';
+    }
+
+    await loadClusters();
+    if(selectedLocation) runPrediction();
+    refreshDashboardView();
+  });
+}
+
+// ---- NEW: quadrant visual (Frequent/Rare x Severe/Mild) ----
+function renderQuadrantGrid(clusters){
+  const grid = document.getElementById('quadrantGrid');
+  if(!grid) return;
+
+  const counts = {
+    'Frequent & Severe': 0,
+    'Frequent & Mild': 0,
+    'Rare & Severe': 0,
+    'Rare & Mild': 0,
+  };
+  clusters.forEach(c => { if(counts[c.quadrant] !== undefined) counts[c.quadrant]++; });
+
+  const cells = [
+    { key: 'Frequent & Severe', cls: 'quadrant-fs', hint: 'steady patrol priority' },
+    { key: 'Frequent & Mild', cls: 'quadrant-fm', hint: 'routine monitoring' },
+    { key: 'Rare & Severe', cls: 'quadrant-rs', hint: 'one-off incident watch' },
+    { key: 'Rare & Mild', cls: 'quadrant-rm', hint: 'low priority' },
+  ];
+
+  grid.innerHTML = cells.map(c => `
+    <div class="quadrant-cell ${c.cls}">
+      <span class="quadrant-cell-label">${c.key}</span>
+      <span class="quadrant-cell-count">${counts[c.key]}</span>
+      <span class="quadrant-cell-label">${c.hint}</span>
+    </div>
+  `).join('');
+}
+
+// ---- NEW: trend mini sparkline (visual stand-in for arrow+pct) ----
+function trendSpark(label, pct){
+  // 4 bars approximating a trend line: rising = ascending heights, falling = descending, stable = flat
+  let heights;
+  if(label === 'rising') heights = [4, 7, 10, 14];
+  else if(label === 'falling') heights = [14, 10, 7, 4];
+  else heights = [8, 8, 8, 8];
+
+  const bars = heights.map(h => `<span class="trend-spark-bar" style="height:${h}px;"></span>`).join('');
+  return `<span class="trend-spark" title="${label} (${pct > 0 ? '+' : ''}${pct}%)">${bars}</span>`;
+}
+
+// ---- NEW: Generate Patrol Report (text export) ----
+function buildPatrolReportText(){
+  const now = new Date();
+  const top = allClusters.slice().sort((a, b) => b.predicted_score - a.predicted_score).slice(0, 5);
+
+  let lines = [];
+  lines.push('BENGALURU PARKING HOTSPOTS — PATROL PRIORITY REPORT');
+  lines.push(`Generated: ${now.toLocaleString()}`);
+  lines.push('');
+  lines.push(`Total tracked areas: ${allClusters.length}`);
+  lines.push(`High-risk areas: ${allClusters.filter(a => riskLabel(a.predicted_score) === 'high').length}`);
+  lines.push('');
+  lines.push('TOP 5 PRIORITY AREAS');
+  lines.push('---------------------');
+  top.forEach((a, i) => {
+    lines.push(`${i + 1}. ${a.location || a.junction_name || a.police_station}`);
+    lines.push(`   Police station : ${a.police_station}`);
+    lines.push(`   Risk level     : ${riskLabel(a.predicted_score)} (impact ${a.predicted_score})`);
+    lines.push(`   Violations     : ${a.violations}`);
+    lines.push(`   Peak time      : ${a.peak_dow_name || '—'} ~${formatHour(a.peak_hour)}`);
+    lines.push(`   Trend          : ${a.trend_label} (${a.trend_pct > 0 ? '+' : ''}${a.trend_pct}%)`);
+    lines.push(`   Quadrant       : ${a.quadrant || '—'}`);
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+const generateReportBtn = document.getElementById('generateReportBtn');
+if(generateReportBtn){
+  generateReportBtn.addEventListener('click', () => {
+    const text = buildPatrolReportText();
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `patrol-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   });
 }

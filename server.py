@@ -11,6 +11,7 @@ Endpoints:
 """
 import os
 import math
+import time
 import pandas as pd
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
@@ -30,6 +31,19 @@ DATA_FILE = os.environ.get(
 )
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+
+
+@app.before_request
+def _log_request_start():
+    print(f"[req] START {request.method} {request.path}?{request.query_string.decode()}", flush=True)
+    request._start_time = time.time()
+
+
+@app.after_request
+def _log_request_end(response):
+    elapsed = time.time() - getattr(request, "_start_time", time.time())
+    print(f"[req] END   {request.method} {request.path} -> {response.status_code} in {elapsed:.2f}s", flush=True)
+    return response
 
 # ---- in-memory state, rebuilt on refresh ----
 state = {"scored": None, "stats": None, "predictor": None, "last_loaded": None}
@@ -167,4 +181,4 @@ def api_status():
 
 if __name__ == "__main__":
     load_state()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True, use_reloader=False)

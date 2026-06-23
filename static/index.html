@@ -223,6 +223,50 @@
   .trend-rising{color:var(--high);font-weight:700;}
   .trend-falling{color:var(--low);font-weight:700;}
   .trend-stable{color:var(--muted);font-weight:700;}
+
+  /* ---- NEW: headline banner ---- */
+  .dash-headline{
+    background:linear-gradient(135deg,var(--accent),#1448a3);color:#fff;
+    border-radius:12px;box-shadow:var(--shadow);padding:18px 22px;margin-bottom:18px;
+    display:flex;flex-wrap:wrap;gap:24px;align-items:center;
+  }
+  .dash-headline-item{display:flex;flex-direction:column;gap:2px;}
+  .dash-headline-value{font-size:24px;font-weight:800;line-height:1.1;}
+  .dash-headline-label{font-size:12px;opacity:0.85;}
+
+  /* ---- NEW: time filter chips ---- */
+  .dash-time-filters{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+  .dash-time-chip{
+    border:1px solid var(--line);background:var(--paper);border-radius:999px;
+    font-size:13px;font-weight:600;padding:7px 16px;cursor:pointer;color:var(--muted);
+  }
+  .dash-time-chip:hover{background:#f2f6ff;}
+  .dash-time-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* ---- NEW: export/report button ---- */
+  .dash-report-btn{
+    border:1px solid var(--accent);background:#fff;color:var(--accent);border-radius:8px;
+    font-size:13px;font-weight:700;padding:9px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;
+  }
+  .dash-report-btn:hover{background:#f2f6ff;}
+  .dash-toolbar-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+
+  /* ---- NEW: quadrant 2x2 grid ---- */
+  .quadrant-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;}
+  .quadrant-cell{
+    border-radius:10px;padding:14px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;
+  }
+  .quadrant-cell-label{font-size:12px;font-weight:700;opacity:0.85;}
+  .quadrant-cell-count{font-size:22px;font-weight:800;}
+  .quadrant-fs{background:#fde2e1;color:#8a2620;}
+  .quadrant-fm{background:#fff1d6;color:#8a5a10;}
+  .quadrant-rs{background:#ffe8d6;color:#9a4a12;}
+  .quadrant-rm{background:#e3f3e9;color:#1f6b3f;}
+
+  /* ---- NEW: trend mini sparkline bar ---- */
+  .trend-spark{display:inline-flex;align-items:center;gap:1px;height:14px;vertical-align:middle;margin-left:4px;}
+  .trend-spark-bar{width:3px;border-radius:1px;background:var(--bar);opacity:0.55;}
+  .trend-spark-bar:last-child{opacity:1;}
 </style>
 </head>
 <body>
@@ -290,6 +334,7 @@
   <div class="dashboard-wrap">
     <div class="dashboard-title">Police Station Priority Dashboard</div>
 
+    <!--
     <div class="dash-toolbar">
       <div class="dash-station-search-wrap">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -297,6 +342,30 @@
         <div class="dash-suggestions" id="dashStationSuggestions" style="display:none;"></div>
       </div>
     </div>
+    -->
+
+    <!-- NEW: toolbar row now also holds time filter chips + report button alongside the search box -->
+    <div class="dash-toolbar-row">
+      <div class="dash-station-search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="dashStationSearch" type="text" placeholder="Search police station…" autocomplete="off" />
+        <div class="dash-suggestions" id="dashStationSuggestions" style="display:none;"></div>
+      </div>
+      <button class="dash-report-btn" id="generateReportBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        Generate Patrol Report
+      </button>
+    </div>
+
+    <div class="dash-time-filters" id="dashTimeFilters">
+      <button class="dash-time-chip active" data-when="now">Now</button>
+      <button class="dash-time-chip" data-when="today-peak">Today peak hour</button>
+      <button class="dash-time-chip" data-when="weekend-night">Weekend night</button>
+      <button class="dash-time-chip" data-when="all">All-time (no filter)</button>
+    </div>
+
+    <!-- NEW: headline banner summarizing citywide risk at a glance -->
+    <div class="dash-headline" id="dashHeadline"></div>
 
     <div id="dashboardDefault">
       <div class="dash-stats-row">
@@ -342,6 +411,13 @@
             <span class="dash-panel-title">Trend overview (rising / falling / stable)</span>
           </div>
           <div id="trendOverviewChart"></div>
+        </div>
+        <!-- NEW: quadrant visual (Frequent/Rare x Severe/Mild) -->
+        <div class="dash-panel">
+          <div class="dash-panel-header">
+            <span class="dash-panel-title">Frequency &times; severity quadrants</span>
+          </div>
+          <div class="quadrant-grid" id="quadrantGrid"></div>
         </div>
       </div>
 
